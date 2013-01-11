@@ -116,7 +116,7 @@ Then run Graphviz:
 
 Run the workflow
 
-    ((g/mk-workflow-fn complete-flow) {:output-tap (cascalog/stdout) :alpha 1 :beta 2 })
+    ((g/mk-workflow-fn complete-flow) {:output-tap (cascalog/stdout) :alpha [[0 1]] :beta [[0 2]] })
     
     ...
     
