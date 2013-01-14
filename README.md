@@ -68,8 +68,8 @@ The following example is a copy of [Stuart Sierra's flow example](https://github
         (+ ?gamma ?delta :> ?epsilon))))
     
     (def complete-flow (g/fns-to-flow #'result #'gamma #'delta #'epsilon))
-    
-    (def complete-flow (g/fns-to-flow #'result #'gamma #'delta #'epsilon))
+
+
 
 Print workflow for debugging
 
