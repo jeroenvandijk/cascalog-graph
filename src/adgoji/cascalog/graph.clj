@@ -33,8 +33,10 @@
         doc-str
         (list (sym-fn fn-sym)  fn-args)))))
 
+(def input-meta-kw :com.stuartsierra.flow/inputs)
+
 (defn- required-args [flow]
-  (mapcat (comp :com.stuartsierra.flow/inputs meta) (vals flow)))
+  (mapcat (comp input-meta-kw meta) (vals flow)))
 
 ;; We need this function in the mk-workflow-fn macro, and therefore it needs to be public?
 (defn external-args [flow]
@@ -45,11 +47,11 @@
 
 (defn calc-steps [flow]
   (let [ext-args (external-args flow)
-        inputs (set (mapcat (comp :com.stuartsierra.flow/inputs meta) (vals flow)))]
+        inputs (set (mapcat (comp input-meta-kw meta) (vals flow)))]
     (reduce (fn [acc [k v]]
               (let [m (meta v)
-                    deps (remove ext-args (:com.stuartsierra.flow/inputs m))
-                    args-deps (:com.stuartsierra.flow/inputs m)
+                    deps (remove ext-args (input-meta-kw m))
+                    args-deps (input-meta-kw m)
                     aliases (:aliases m)
                     args-names (map #(get aliases % %) args-deps)
                     step-deps (remove (external-args flow) args-deps)
@@ -68,7 +70,7 @@
 (defn- flow-graph [flow]
   (reduce (fn [graph [output f]]
             (reduce (fn [g input] (dep/depend g output input))
-                    graph (::com.stuartsierra.flow/inputs (meta f))))
+                    graph (input-meta-kw (meta f))))
           (dep/graph) flow))
 
 (defn- sort-graph [flow steps]
@@ -100,7 +102,7 @@
                 (mk-intermediate-step {:name k :deps step-deps :fn-doc fn-doc :fn-sym f :fn-args f-args})
                 (mk-endpoint-step {:name k :deps step-deps :fn-doc fn-doc :fn-sym f :fn-args f-args})))))))
 
-(defn pp-workflow 
+(defn pp-workflow
   "Pretty prints a complete checkpoint workflow for debugging"
   [flow]
   (->> (flow->workflow flow)
@@ -109,7 +111,7 @@
        (clojure.string/join "\n")
        println))
 
-(defn fns-to-flow 
+(defn fns-to-flow
   "Given a list of flow functions a graph will be generated that can be printed or executed"
   [& fns]
   (apply hash-map (mapcat
@@ -122,32 +124,32 @@
                        [name v])) fns)))
 
 ;; TODO remove duplication between rename-meta,rename-meta-all,update-flow,update-flow-all
-(defn rename-meta-all 
+(defn rename-meta-all
   "Rename steps and all inputs of a graph"
   [v inner-deps func]
   (let [m (meta v)
-        inputs (:com.stuartsierra.flow/inputs  m)
+        inputs (input-meta-kw  m)
         new-inputs (map func inputs)
         aliases (zipmap new-inputs inputs)]
-        (with-meta v (assoc m :com.stuartsierra.flow/inputs new-inputs :aliases aliases))))
+        (with-meta v (assoc m input-meta-kw new-inputs :aliases aliases))))
 
-(defn rename-meta 
+(defn rename-meta
   "Rename steps of a graph"
   [v inner-deps func]
   (let [m (meta v)
-        [inner-inputs external-inputs] (split-with inner-deps (:com.stuartsierra.flow/inputs  m))
+        [inner-inputs external-inputs] (split-with inner-deps (input-meta-kw  m))
         new-inputs (map func inner-inputs)
         aliases (zipmap new-inputs inner-inputs)
         all-inputs (set (concat new-inputs external-inputs))]
-        (with-meta v (assoc m :com.stuartsierra.flow/inputs all-inputs :aliases aliases))))
+        (with-meta v (assoc m input-meta-kw all-inputs :aliases aliases))))
 
-(defn update-flow 
+(defn update-flow
   "Update step names of a graph"
   [graph func]
   (let [inner-deps (set (keys graph))]
     (reduce (fn [acc [k v]] (assoc acc (func k) (rename-meta v inner-deps func))) {} graph)))
 
-(defn update-flow-all 
+(defn update-flow-all
   "Update step names and input names of a graph
   Useful for reusing a graph structure with different inputs
   "
@@ -157,7 +159,7 @@
 
 (declare flow-fn)
 
-(defmacro mk-workflow-fn 
+(defmacro mk-workflow-fn
   "Create a function that can run a workflow
   Accepts keyword arguments"
   [flow]
@@ -188,7 +190,7 @@
                   a Graphiviz reserved word such as \"graph\"."
   f/dot)
 
-(def write-dotfile 
+(def write-dotfile
   "Writes a Graphviz dotfile for a Flow. options are the same as for
     'dot'."
   f/write-dotfile)
