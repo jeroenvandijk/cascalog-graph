@@ -1,4 +1,4 @@
-(defproject adgoji/cascalog-graph "0.0.2"
+(defproject adgoji/cascalog-graph "0.2.0-SNAPSHOT"
   :description "Graph implementation for Cascalog"
   :url "http://github.com/jeroenvandijk/cascalog-graph"
   :license { :name "Eclipse Public License"
