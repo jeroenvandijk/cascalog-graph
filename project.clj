@@ -15,13 +15,14 @@
                  ;; FIXME There seems to be an issue with 0.1.0
                  [prismatic/plumbing "0.0.1"]
 
-
                  ;; REVIEW We only rely on some Cascalog symbols and during testing. Can we
                  ;; remove this to dev profile instead?
                  [cascalog "1.9.0"]
-                 
 
                  [cascalog-checkpoint "0.2.0"]
+                 
+                 ;; Command line args processing
+                 [org.clojure/tools.cli "0.2.1"]
                 ]
 
   :profiles {
