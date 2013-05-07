@@ -26,13 +26,13 @@ Cascalog.checkpoint is great for when you start to build complex flows. It makes
 
 Cascalog-Graph is on [Clojars](https://clojars.org/adgoji/cascalog-graph)
 
-Latest release is 0.0.1
+Latest release is 0.2.0
 
 [Leiningen](https://github.com/technomancy/leiningen) dependency information:
 
-    [adgoji/cascalog-graph "0.0.1"]
+    [adgoji/cascalog-graph "0.2.0"]
 
-The Git master branch is at version 0.0.1-SNAPSHOT.
+The Git master branch is at version 0.2.1-SNAPSHOT.
 
 ## Usage
 
@@ -41,7 +41,7 @@ The following example is a copy of [Stuart Sierra's flow example](https://github
     (require '[cascalog.api :as cascalog]
              '[adgoji.cascalog.graph :as g])
 
-    (def result (g/flow-fn [gamma delta epsilon output-tap]
+    (def result (g/fnk [gamma delta epsilon output-tap]
       (?<- output-tap 
         [?result]
         (gamma ?idx ?gamma)
@@ -49,92 +49,67 @@ The following example is a copy of [Stuart Sierra's flow example](https://github
         (epsilon ?idx ?epsilon)
         (+ ?gamma ?delta ?epsilon :> ?result))))
     
-    (def gamma (g/flow-fn [alpha beta]
+    (def gamma (g/query-fnk [alpha-tap beta-tap]
       (<- [?idx ?gamma]
-        (alpha ?idx ?alpha)
-        (beta ?idx ?beta)
+        (alpha-tap ?idx ?alpha)
+        (beta-tap ?idx ?beta)
         (+ ?alpha ?beta :> ?gamma))))
     
-    (def delta (g/flow-fn [alpha gamma]
+    (def delta (g/query-fnk [alpha-tap gamma]
       (<- [?idx ?delta]
-        (alpha ?idx ?alpha)
+        (alpha-tap ?idx ?alpha)
         (gamma ?idx ?gamma)
         (+ ?gamma ?alpha :> ?delta))))
     
-    (def epsilon (g/flow-fn [gamma delta]
+    (def epsilon (g/query-fnk [gamma delta]
       (<- [?idx ?epsilon]
         (gamma ?idx ?gamma)
         (delta ?idx ?delta)
         (+ ?gamma ?delta :> ?epsilon))))
     
-    (def complete-flow (g/fns-to-flow #'result #'gamma #'delta #'epsilon))
+    (def complete-flow {:result result 
+                        :gamma gamma 
+                        :delta delta 
+                        :epsilon epsilon})
+    
+Create a function that wraps the workflow
 
+    ((g/workflow-compile complete-flow) {:alpha-tap [[0 1]] :beta-tap [[0 2]]}) ;=> 14
 
+Or create a command line access point to the workflow
+
+    (require '[adgoji.cascalog.cli :refer [defjob]])
+    
+    (defjob example complete-flow)
+    
+And execute it from the command line:
+
+    your_namespace.example --alpha-tap alpha.hfs-seqfile --beta-tap beta.hfs-seqfile --output-tap stdout
 
 Print workflow for debugging
 
-    user=> (g/pp-workflow complete-flow)
-    gamma-step ([:deps nil :tmp-dirs [gamma-dir]]
-      :gamma: 
-      (cascalog.api/?- (cascalog.api/hfs-seqfile gamma-dir) (user/gamma {:beta beta, :alpha alpha})))
-    delta-step ([:deps [gamma-step] :tmp-dirs [delta-dir]]
-      :delta: 
-      (cascalog.api/?- (cascalog.api/hfs-seqfile delta-dir) (user/delta {:gamma (cascalog.api/hfs-seqfile gamma-dir), :alpha alpha})))
-    epsilon-step ([:deps [delta-step gamma-step] :tmp-dirs [epsilon-dir]]
-      :epsilon: 
-      (cascalog.api/?- (cascalog.api/hfs-seqfile epsilon-dir) (user/epsilon {:gamma (cascalog.api/hfs-seqfile gamma-dir), :delta (cascalog.api/hfs-seqfile delta-dir)})))
-    result-step ([:deps [epsilon-step delta-step gamma-step]]
-      :result: 
-      (user/result {:gamma (cascalog.api/hfs-seqfile gamma-dir), :delta (cascalog.api/hfs-seqfile delta-dir), :output-tap output-tap, :epsilon (cascalog.api/hfs-seqfile epsilon-dir)}))
-    nil
+    lein run -m your_namespace.example --mode debug
 
+Output to Graphiz' dot format for visualization:
 
-Output dot for visualization:
+    lein run -m your_namespace.example --mode dot
 
-    user=> (g/dot complete-flow)
-    digraph "flow" {
-       "alpha" -> "delta" ;
-       "alpha" -> "gamma" ;
-       "epsilon" -> "result" ;
-       "output-tap" -> "result" ;
-       "delta" -> "epsilon" ;
-       "delta" -> "result" ;
-       "beta" -> "gamma" ;
-       "gamma" -> "epsilon" ;
-       "gamma" -> "result" ;
-       "gamma" -> "delta" ;
-    }
-    nil
+Or directly open the Graphiz dot file in preview (tested on a Mac)
 
-Write that out to a file:
+    lein run -m your_namespace.example --mode preview
 
-    (g/write-dotfile process-flow "flow.dot")
+Sometimes you need to validate the input through the command line (e.g. with something like Lemur)
 
-Then run Graphviz:
-
-    $ dot -Tpng -o flow.png flow.dot
-
-Run the workflow
-
-    ((g/mk-workflow-fn complete-flow) {:output-tap (cascalog/stdout) :alpha [[0 1]] :beta [[0 2]] })
-    
-    ...
-    
-    RESULTS
-    -----------------------
-    14
+    lein run -m your_namespace.example --mode validation
 
 ## Todo
 
-* Provide better examples
-* Add tests
-* Internal code cleanup
-* Gather feedback from Cascalog.Checkpoint users
+* Change the underlying bridge to Cascalog.checkpoint. Instead of generating code it should directly call the Checkpoint API. This will make things like skipping steps actually work
 
 ## Credits
 
 * Prismatic for coining the ideas of Graph (see [blogpost]([http://blog.getprismatic.com/blog/2012/10/1/prismatics-graph-at-strange-loop.html))
-* Stuart Sierra for building flow [an implementation of the Graph idea](https://github.com/stuartsierra/flow) and an important dependency for this project
+* Stuart Sierra for building flow [an implementation of the Graph idea](https://github.com/stuartsierra/flow) 
 * Sam Ritchie and Contributors for building Cascalog.checkpoint that makes this library actually do anything
 * [AdGoji](http://www.adgoji.com/) for giving me time to work on this
 
