@@ -27,7 +27,6 @@
 
   :profiles {
     :dev {
-          :source-paths ["dev/src"]
           :plugins [
                      [lein-midje "3.0.1"]]
 
