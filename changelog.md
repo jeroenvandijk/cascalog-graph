@@ -1,3 +1,7 @@
+## 0.2.2
+
+* Removed old dependencies
+
 ## 0.2.1
 
 * Validation bug fix
