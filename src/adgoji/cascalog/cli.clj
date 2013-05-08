@@ -89,7 +89,7 @@
 
 (defn check-missing-options! [opts banner]
   (let [empty-inputs (map (comp (partial str "--") name) (keys (filter (fn [[k v]] (nil? v)) opts)))]
-    (when (empty? empty-inputs)
+    (when (seq empty-inputs)
       (println (str "The following arguments are absent or empty " (clojure.string/join ", " empty-inputs)))
       (print-usage banner)
       (System/exit -1))))
