@@ -9,9 +9,6 @@
              "-Xms1024M" "-Xmx1048M" "-server"]
 
   :dependencies [
-                 [com.stuartsierra/flow "0.1.0"]
-                 [org.clojure/tools.namespace "0.2.2"]
-                 
                  ;; FIXME There seems to be an issue with 0.1.0
                  [prismatic/plumbing "0.0.1"]
 

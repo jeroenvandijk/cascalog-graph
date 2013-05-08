@@ -1,7 +1,5 @@
 (ns adgoji.cascalog.graph
-  (:require [com.stuartsierra.flow :as f]
-            [clojure.tools.namespace.dependency :as dep]
-            [plumbing.core :as gc]
+  (:require [plumbing.core :as gc]
             [plumbing.graph :as graph]
             [plumbing.fnk.pfnk :as pfnk]
             [cascalog.api :refer [?- hfs-seqfile]]
