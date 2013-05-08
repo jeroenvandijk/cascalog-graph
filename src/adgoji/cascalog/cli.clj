@@ -82,7 +82,7 @@
   (println)
   (println "Manual")
   (println "-------------")
-  (println (str "Cascading tap arguments can be one of the following schemes: " (clojure.string/join ", " (keys (methods mk-tap)))))
+  (println (str "Cascading tap arguments can be one of the following schemes: " (clojure.string/join ", " (remove #{nil :default} (keys (methods mk-tap))))))
   (println      "Use the format <tap-scheme>:<tap-args> or <tap-args-without-extension>.<extension> to indicate the tap format")
   (println)
   (println switches-usage))
