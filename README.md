@@ -26,13 +26,13 @@ Cascalog.checkpoint is great for when you start to build complex flows. It makes
 
 Cascalog-Graph is on [Clojars](https://clojars.org/adgoji/cascalog-graph)
 
-Latest release is 0.2.1
+Latest release is 0.2.2
 
 [Leiningen](https://github.com/technomancy/leiningen) dependency information:
 
-    [adgoji/cascalog-graph "0.2.1"]
+    [adgoji/cascalog-graph "0.2.2"]
 
-The Git master branch is at version 0.2.2-SNAPSHOT.
+The Git master branch is at version 0.2.3-SNAPSHOT.
 
 ## Usage
 
