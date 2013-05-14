@@ -30,7 +30,9 @@ Latest release is 0.2.2
 
 [Leiningen](https://github.com/technomancy/leiningen) dependency information:
 
-    [adgoji/cascalog-graph "0.2.2"]
+```clojure
+[adgoji/cascalog-graph "0.2.2"]
+```
 
 The Git master branch is at version 0.2.3-SNAPSHOT.
 
@@ -38,53 +40,59 @@ The Git master branch is at version 0.2.3-SNAPSHOT.
 
 The following example is a copy of [Stuart Sierra's flow example](https://github.com/stuartsierra/flow) molded into Cascalog Graph form.
 
-    (require '[cascalog.api :as cascalog]
-             '[adgoji.cascalog.graph :as g])
+```clojure
+(require '[cascalog.api :as cascalog]
+         '[adgoji.cascalog.graph :as g])
 
-    (def result (g/fnk [gamma delta epsilon output-tap]
-      (?<- output-tap 
-        [?result]
-        (gamma ?idx ?gamma)
-        (delta ?idx ?delta)
-        (epsilon ?idx ?epsilon)
-        (+ ?gamma ?delta ?epsilon :> ?result))))
-    
-    (def gamma (g/query-fnk [alpha-tap beta-tap]
-      (<- [?idx ?gamma]
-        (alpha-tap ?idx ?alpha)
-        (beta-tap ?idx ?beta)
-        (+ ?alpha ?beta :> ?gamma))))
-    
-    (def delta (g/query-fnk [alpha-tap gamma]
-      (<- [?idx ?delta]
-        (alpha-tap ?idx ?alpha)
-        (gamma ?idx ?gamma)
-        (+ ?gamma ?alpha :> ?delta))))
-    
-    (def epsilon (g/query-fnk [gamma delta]
-      (<- [?idx ?epsilon]
-        (gamma ?idx ?gamma)
-        (delta ?idx ?delta)
-        (+ ?gamma ?delta :> ?epsilon))))
-    
-    (def complete-flow {:result result 
-                        :gamma gamma 
-                        :delta delta 
-                        :epsilon epsilon})
-    
+(def result (g/fnk [gamma delta epsilon output-tap]
+  (?<- output-tap 
+    [?result]
+    (gamma ?idx ?gamma)
+    (delta ?idx ?delta)
+    (epsilon ?idx ?epsilon)
+    (+ ?gamma ?delta ?epsilon :> ?result))))
+
+(def gamma (g/query-fnk [alpha-tap beta-tap]
+  (<- [?idx ?gamma]
+    (alpha-tap ?idx ?alpha)
+    (beta-tap ?idx ?beta)
+    (+ ?alpha ?beta :> ?gamma))))
+
+(def delta (g/query-fnk [alpha-tap gamma]
+  (<- [?idx ?delta]
+    (alpha-tap ?idx ?alpha)
+    (gamma ?idx ?gamma)
+    (+ ?gamma ?alpha :> ?delta))))
+
+(def epsilon (g/query-fnk [gamma delta]
+  (<- [?idx ?epsilon]
+    (gamma ?idx ?gamma)
+    (delta ?idx ?delta)
+    (+ ?gamma ?delta :> ?epsilon))))
+
+(def complete-flow {:result result 
+                    :gamma gamma 
+                    :delta delta 
+                    :epsilon epsilon})
+```
+
 Create a function that wraps the workflow
 
-    ((g/workflow-compile complete-flow) {:alpha-tap [[0 1]] :beta-tap [[0 2]]}) ;=> 14
+```clojure
+((g/workflow-compile complete-flow) {:alpha-tap [[0 1]] :beta-tap [[0 2]]}) ;=> 14
+```
 
 Or create a command line access point to the workflow
 
-    (require '[adgoji.cascalog.cli :refer [defjob]])
-    
-    (defjob example complete-flow)
+```clojure
+(require '[adgoji.cascalog.cli :refer [defjob]])
+
+(defjob example complete-flow)
+```
     
 And execute it from the command line:
 
-    your_namespace.example --alpha-tap alpha.hfs-seqfile --beta-tap beta.hfs-seqfile --output-tap stdout
+    lein run -m your_namespace.example --alpha-tap alpha.hfs-seqfile --beta-tap beta.hfs-seqfile --output-tap stdout
 
 Print workflow for debugging
 
