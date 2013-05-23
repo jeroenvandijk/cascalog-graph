@@ -53,6 +53,15 @@
                   (list 'fetch-state k)
                   (symbol (name k)))]) ks)))
 
+(defn dependency-graph [g]
+  (reduce (fn [acc [k v]]
+            (reduce (fn [acc0 dep]
+                      (update-in acc0 [dep] (fnil conj []) k)) acc
+                      (keys (pfnk/input-schema v)))) {} g))
+
+(defn steps-dependent [g k]
+  (k (dependency-graph g)))
+
 (defn mk-step [g [k v]]
   (let [dep-keys (keys (pfnk/input-schema v))
         fn-args (mk-fn-args g dep-keys)
@@ -68,18 +77,39 @@
 (defmacro fnk [& args]
   `(gc/fnk ~@args))
 
-(defn mk-workflow [tmp-dir graph-like]
-  (let [graph (graph/->graph graph-like)
-        input-keys (map (comp symbol name key) (pfnk/input-schema graph))]
-    (list 'let (vector 'graph# graph)
-          (list `fnk (vec input-keys)
-                (list
-                 'let '[state (atom {})
-                        save-state (fn [k v] (swap! state assoc k v))
-                        fetch-state (fn [k] (@state k))]
-                 (list 'do (concat (list `checkpoint/workflow [tmp-dir])
-                                   (mapcat (partial mk-step graph) graph))
-                       'state))))))
+(defn mk-workflow
+  ([tmp-dir graph-like] (mk-workflow tmp-dir graph-like {} {}))
+  ([tmp-dir graph-like input-mapping output-mapping]
+     (let [graph-like (reduce (fn [g [k v]]
+                           (if (seq (steps-dependent g k))
+                             (assoc g v (pfnk/fn->fnk (fn [{input-tap k output-tap v}]
+                                                        (?- output-tap input-tap))
+                                                      [{k true} true]))
+                             ;; Update old function keep old-schemata plus the output tap schemata
+                             ;; -
+                             ;; (?- ~(symbol (name v)) (apply prev-fn args)
+                             (update-in g [k] (fn [prev-fn]
+                                                (pfnk/fn->fnk (fn [{input-tap k output-tap v :as args}]
+                                                                (?- output-tap (apply prev-fn (dissoc args v))))
+                                                              (update-in (pfnk/io-schemata prev-fn) [0] assoc v true))))))
+                         graph-like (filter (comp graph-like key) output-mapping))
+           graph (graph/->graph graph-like)
+           input-keywords (set (keys (pfnk/input-schema graph)))
+           input-mapping (select-keys input-mapping input-keywords)
+           input-keys (mapv (comp symbol name)
+                            (concat (clojure.set/difference input-keywords (keys input-mapping))
+                                    (vals input-mapping)))]
+       (list 'let (vector 'graph# graph)
+             (list `fnk input-keys
+                   (list
+                    'let (vec (concat
+                               (map (comp symbol name) (flatten (seq input-mapping)))
+                               '[state (atom {})
+                                 save-state (fn [k v] (swap! state assoc k v))
+                                 fetch-state (fn [k] (@state k))]))
+                    (list 'do (concat (list `checkpoint/workflow [tmp-dir])
+                                      (mapcat (partial mk-step graph) graph))
+                          'state)))))))
 
 (defmacro tmp-dir-fnk [& args]
   (let [f (eval `(gc/fnk ~@args))
@@ -102,6 +132,8 @@
   ([graph] (workflow-compile "/tmp/cascalog-checkpoint" graph))
   ([tmp-dir graph]
      (eval (mk-workflow tmp-dir graph))))
+
+
 
 ;; Adopted from https://github.com/stuartsierra/flow/blob/master/src/com/stuartsierra/flow.clj#L138
 (defn dot-compile
