@@ -25,10 +25,10 @@
 (defn- mk-state-fnk-part [name fn-args]
   (list 'save-state name (list (list 'graph# name) fn-args)))
 
-(defn- mk-query-state-fnk-part [name fn-args]
-  (list 'let (vector 'tmp-seqfile (list `hfs-seqfile (sym-dir name)))
-        (list `?- 'tmp-seqfile (list (list 'graph# name) fn-args))
-        (list 'save-state name 'tmp-seqfile)))
+(defn- mk-query-state-fnk-part [step-name fn-args]
+  (list 'let (vector 'tmp-seqfile (list `hfs-seqfile (sym-dir step-name)))
+        (list `?- (str (name step-name)) 'tmp-seqfile (list (list 'graph# step-name) fn-args))
+        (list 'save-state step-name 'tmp-seqfile)))
 
 (defn- mk-tmp-dir-fnk-step [{:keys [name deps fn-args]}]
   (let [tmp-dir (sym-dir name)
