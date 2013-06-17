@@ -28,7 +28,7 @@
  (fact "`query-fnk is correctly translated to a workflow step"
    (mk-step g (first g)) => '(a-step ([:deps nil :tmp-dirs [a-dir]]
                                         (let [tmp-seqfile (cascalog.api/hfs-seqfile a-dir)]
-                                          (cascalog.api/?- tmp-seqfile ((graph# :a) {:b b}))
+                                          (cascalog.api/?- "a" tmp-seqfile ((graph# :a) {:b b}))
                                           (save-state :a tmp-seqfile))))
    ))
 
@@ -146,15 +146,15 @@
              (cascalog.checkpoint/workflow ["tmp/foo"]
                                            gamma-step ([:deps nil :tmp-dirs [gamma-dir]]
                                                          (let [tmp-seqfile (cascalog.api/hfs-seqfile gamma-dir)]
-                                                           (cascalog.api/?- tmp-seqfile ((graph# :gamma) {:alpha alpha, :beta beta}))
+                                                           (cascalog.api/?- "gamma" tmp-seqfile ((graph# :gamma) {:alpha alpha, :beta beta}))
                                                            (save-state :gamma tmp-seqfile)))
                                            delta-step ([:deps [gamma-step] :tmp-dirs [delta-dir]]
                                                          (let  [tmp-seqfile (cascalog.api/hfs-seqfile delta-dir)]
-                                                           (cascalog.api/?- tmp-seqfile ((graph# :delta) {:alpha alpha, :gamma (fetch-state :gamma)}))
+                                                           (cascalog.api/?- "delta" tmp-seqfile ((graph# :delta) {:alpha alpha, :gamma (fetch-state :gamma)}))
                                                            (save-state :delta tmp-seqfile)))
                                            epsilon-step ([:deps [delta-step gamma-step] :tmp-dirs [epsilon-dir]]
                                                            (let [tmp-seqfile (cascalog.api/hfs-seqfile epsilon-dir)]
-                                                             (cascalog.api/?- tmp-seqfile ((graph# :epsilon) {:delta (fetch-state :delta), :gamma (fetch-state :gamma)}))
+                                                             (cascalog.api/?- "epsilon" tmp-seqfile ((graph# :epsilon) {:delta (fetch-state :delta), :gamma (fetch-state :gamma)}))
                                                              (save-state :epsilon tmp-seqfile)))
                                            result-step ([:deps [epsilon-step delta-step gamma-step] :tmp-dirs [result-dir]]
                                                           (save-state :result ((graph# :result) {:delta (fetch-state :delta), :epsilon (fetch-state :epsilon), :gamma (fetch-state :gamma), :tmp-dir result-dir})))
