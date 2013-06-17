@@ -130,8 +130,9 @@
 (defn str->tap
   ([tap-str] (str->tap tap-str :unknown))
   ([tap-str type]
-     (let [{:keys [format path params]} (parse-tap-str tap-str)]
-       #_(use-tap format type path params))))
+     (let [{:keys [format] :as tap-params } (parse-tap-str tap-str)
+           tap (mk-tap* (mk-tap format))]
+       ((:tap-fn tap) tap-params))))
 
 (defn- calculate-cli-options [inputs-kws]
   (cons
@@ -188,7 +189,7 @@
     (if-let [errors (seq (filter (comp seq :errors val) opts))]
       (print-errors+banner errors banner)
       (if-let [validation-errors (seq (remove nil?
-                                              (map (fn [[k v]] ((:validation-fn v))) opts)))]
+                                              (map (fn [[k v]] ((get v :validation-fn (constantly nil)))) opts)))]
         (println+error-exit opts "found errors during tap validation " validation-errors)
         (callback (into {}
                          (map (fn [[k v]]
