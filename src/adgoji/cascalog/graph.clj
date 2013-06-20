@@ -68,8 +68,11 @@
 (defmacro fnk [& args]
   `(gc/fnk ~@args))
 
+(defn graphify [graph-like]
+  (graph/->graph graph-like))
+  
 (defn mk-workflow [tmp-dir graph-like]
-  (let [graph (graph/->graph graph-like)
+  (let [graph (graphify graph-like)
         input-keys (map (comp symbol name key) (pfnk/input-schema graph))]
     (list 'let (vector 'graph# graph)
           (list `fnk (vec input-keys)
@@ -80,6 +83,12 @@
                  (list 'do (concat (list `checkpoint/workflow [tmp-dir])
                                    (mapcat (partial mk-step graph) graph))
                        'state))))))
+
+(defn fnk-type [fnk]
+  (::fnk-type (meta fnk)))
+  
+(defn fnk-deps [fnk]
+  (keys (pfnk/input-schema fnk)))
 
 (defmacro tmp-dir-fnk [& args]
   (let [f (eval `(gc/fnk ~@args))
