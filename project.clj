@@ -1,4 +1,4 @@
-(defproject adgoji/cascalog-graph "0.2.3-SNAPSHOT"
+(defproject adgoji/cascalog-graph "0.2.4-SNAPSHOT"
   :description "Graph implementation for Cascalog"
   :url "http://github.com/jeroenvandijk/cascalog-graph"
   :license { :name "Eclipse Public License"
@@ -29,7 +29,7 @@
 
           :dependencies [
                          [midje "1.5.1"]
-
+                         [cascalog/midje-cascalog "1.10.1"]
                          [org.clojure/clojure "1.4.0"]
                          [org.apache.hadoop/hadoop-core "0.20.2-dev" :exclusions [log4j org.slf4j/slf4j-log4j12 org.slf4j/slf4j-api commons-logging]]]
     }

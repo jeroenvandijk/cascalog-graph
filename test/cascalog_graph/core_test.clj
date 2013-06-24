@@ -89,15 +89,15 @@
              (cascalog.checkpoint/workflow ["tmp/foo"]
                                            gamma-step ([:deps nil :tmp-dirs [gamma-dir]]
                                                          (let [tmp-seqfile (cascalog.api/hfs-seqfile gamma-dir)]
-                                                           (cascalog.api/?- tmp-seqfile ((graph# :gamma) {:alpha alpha, :beta beta}))
+                                                           (cascalog.api/?- "gamma" tmp-seqfile ((graph# :gamma) {:alpha alpha, :beta beta}))
                                                            (save-state :gamma tmp-seqfile)))
                                            delta-step ([:deps [gamma-step] :tmp-dirs [delta-dir]]
                                                          (let  [tmp-seqfile (cascalog.api/hfs-seqfile delta-dir)]
-                                                           (cascalog.api/?- tmp-seqfile ((graph# :delta) {:alpha alpha, :gamma (fetch-state :gamma)}))
+                                                           (cascalog.api/?- "delta" tmp-seqfile ((graph# :delta) {:alpha alpha, :gamma (fetch-state :gamma)}))
                                                            (save-state :delta tmp-seqfile)))
                                            epsilon-step ([:deps [delta-step gamma-step] :tmp-dirs [epsilon-dir]]
                                                            (let [tmp-seqfile (cascalog.api/hfs-seqfile epsilon-dir)]
-                                                             (cascalog.api/?- tmp-seqfile ((graph# :epsilon) {:delta (fetch-state :delta), :gamma (fetch-state :gamma)}))
+                                                             (cascalog.api/?- "epsilon" tmp-seqfile ((graph# :epsilon) {:delta (fetch-state :delta), :gamma (fetch-state :gamma)}))
                                                              (save-state :epsilon tmp-seqfile)))
                                            result-step ([:deps [epsilon-step delta-step gamma-step] :tmp-dirs [result-dir]]
                                                           (save-state :result ((graph# :result) {:delta (fetch-state :delta), :epsilon (fetch-state :epsilon), :gamma (fetch-state :gamma), :tmp-dir result-dir})))
@@ -108,33 +108,33 @@
              state))))
 
  (fact "correct workflow renamed workflow for outputs"
-   (last (mk-workflow "tmp/foo" graph {:alpha :alpha-renamed} {:epsilon :epsilon-tap})) =>
-   '(adgoji.cascalog.graph/fnk [tmp-state beta alpha-renamed]
-         (let [alpha alpha-renamed
-               state (atom {})
-               save-state (fn [k v] (swap! state assoc k v))
-               fetch-state (fn [k] ((clojure.core/deref state) k))]
-           (do
-             (cascalog.checkpoint/workflow ["tmp/foo"]
-                                           gamma-step ([:deps nil :tmp-dirs [gamma-dir]]
-                                                         (let [tmp-seqfile (cascalog.api/hfs-seqfile gamma-dir)]
-                                                           (cascalog.api/?- tmp-seqfile ((graph# :gamma) {:alpha alpha, :beta beta}))
-                                                           (save-state :gamma tmp-seqfile)))
-                                           delta-step ([:deps [gamma-step] :tmp-dirs [delta-dir]]
-                                                         (let  [tmp-seqfile (cascalog.api/hfs-seqfile delta-dir)]
-                                                           (cascalog.api/?- tmp-seqfile ((graph# :delta) {:alpha alpha, :gamma (fetch-state :gamma)}))
-                                                           (save-state :delta tmp-seqfile)))
-                                           epsilon-step ([:deps [delta-step gamma-step] :tmp-dirs [epsilon-dir]]
-                                                           (let [tmp-seqfile (cascalog.api/hfs-seqfile epsilon-dir)]
-                                                             (cascalog.api/?- tmp-seqfile ((graph# :epsilon) {:delta (fetch-state :delta), :gamma (fetch-state :gamma)}))
-                                                             (save-state :epsilon tmp-seqfile)))
-                                           result-step ([:deps [epsilon-step delta-step gamma-step] :tmp-dirs [result-dir]]
-                                                          (save-state :result ((graph# :result) {:delta (fetch-state :delta), :epsilon (fetch-state :epsilon), :gamma (fetch-state :gamma), :tmp-dir result-dir})))
-                                           final-step-step ([:deps :all]
-                                                              (save-state :final-step ((graph# :final-step) {:tmp-state tmp-state})))
-                                           read-result-step ([:deps [result-step]]
-                                                               (save-state :read-result ((graph# :read-result) {:result (fetch-state :result) :tmp-state tmp-state}))))
-             state))))
+       (last (mk-workflow "tmp/foo" graph {:alpha :alpha-renamed} {:epsilon :epsilon-tap})) =>
+       '(adgoji.cascalog.graph/fnk [tmp-state beta alpha-renamed]
+                                   (let [alpha alpha-renamed
+                                         state (atom {})
+                                         save-state (fn [k v] (swap! state assoc k v))
+                                         fetch-state (fn [k] ((clojure.core/deref state) k))]
+                                     (do (cascalog.checkpoint/workflow ["tmp/foo"]
+                                                                       gamma-step ([:deps nil :tmp-dirs [gamma-dir]]
+                                                                                     (let [tmp-seqfile (cascalog.api/hfs-seqfile gamma-dir)]
+                                                                                       (cascalog.api/?- "gamma" tmp-seqfile
+                                                                                                        ((graph# :gamma) {:alpha alpha, :beta beta})) (save-state :gamma tmp-seqfile)))
+                                                                       delta-step ([:deps [gamma-step] :tmp-dirs [delta-dir]]
+                                                                                     (let [tmp-seqfile (cascalog.api/hfs-seqfile delta-dir)]
+                                                                                       (cascalog.api/?- "delta" tmp-seqfile ((graph# :delta) {:alpha alpha, :gamma (fetch-state :gamma)}))
+                                                                                       (save-state :delta tmp-seqfile)))
+                                                                       epsilon-step ([:deps [delta-step gamma-step] :tmp-dirs [epsilon-dir]]
+                                                                                       (let [tmp-seqfile (cascalog.api/hfs-seqfile epsilon-dir)]
+                                                                                         (cascalog.api/?- "epsilon" tmp-seqfile ((graph# :epsilon) {:delta (fetch-state :delta), :gamma (fetch-state :gamma)}))
+                                                                                         (save-state :epsilon tmp-seqfile)))
+                                                                       epsilon-tap-step ([:deps [epsilon-step]]
+                                                                                           (save-state :epsilon-tap ((graph# :epsilon-tap) {:epsilon (fetch-state :epsilon)})))
+                                                                       result-step ([:deps [epsilon-step delta-step gamma-step] :tmp-dirs [result-dir]]
+                                                                                      (save-state :result ((graph# :result) {:delta (fetch-state :delta), :epsilon (fetch-state :epsilon), :gamma (fetch-state :gamma), :tmp-dir result-dir})))
+                                                                       final-step-step ([:deps :all]
+                                                                                          (save-state :final-step ((graph# :final-step) {:tmp-state tmp-state})))
+                                                                       read-result-step ([:deps [result-step]]
+                                                                                           (save-state :read-result ((graph# :read-result) {:result (fetch-state :result), :tmp-state tmp-state})))) state))))
 
  (fact "correct workflow"
    (last (mk-workflow "tmp/foo" graph)) =>

@@ -109,7 +109,7 @@
     [(str "tap type " format  " is not allowed as " type ", only the following are allowed "  allowed-types)]))
 
 (defn mk-tap* [tap tap-name {:keys [format type path params] :or {type :unknown}}]
-  (let [options-conf  (merge (tap :options) (tap :sink-options) (tap :source-options))
+  (let [options-conf  (merge (tap :params) (tap :sink-options) (tap :source-options))
         format-errors (validate-format tap-name (:allowed-types tap) type format)
         params ((tap :params-transform identity) params)
         errors (concat format-errors (validate-options tap-name options-conf params))]

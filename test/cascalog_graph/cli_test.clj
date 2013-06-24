@@ -49,17 +49,18 @@
  "the parameters \"z\",\"x\" are not supported. Choose from foo=bar|baz")
 
 (defn test-tap [config name uri]
-  (dissoc (cli/mk-tap* config name uri) :validation-fn))
+  (dissoc (cli/mk-tap* config name (cli/parse-tap-str uri)) :validation-fn :tap-fn))
 
 (fact "Should parse params correctly"
-      (test-tap  {:options { :a { :vals { "1" "an option"}}}} "foo-tap" "foo.test-plain?a=1")
+      (test-tap  {:params { :a { :vals { "1" "an option"}}}} "foo-tap" "foo.test-plain?a=1")
        => {:path "foo.test-plain" :type :unknown :params { :a "1"}})
 
 (let [tap-conf {:params-transform cli/keywordize-options
-                :options { :a { :vals { :1 "an option"}}}}]
+                :params { :a { :vals { :1 "an option"}}}}]
   (fact "applies params-transform correctly"
         (test-tap tap-conf "foo-tap" "foo.test-plain?a=1") => {:path "foo.test-plain" :type :unknown :params { :a :1}})
   (fact "complains about invalid options"
-        (test-tap tap-conf "foo-tap" "foo.test-plain?c=1") => {:errors {:c "is not a valid option"}})
+        (test-tap tap-conf "foo-tap" "foo.test-plain?c=1") => {:errors [":c is not a valid option"]})
   (fact "complains about invalid option values"
-        (test-tap tap-conf "foo-tap" "foo.test-plain?a=2") => {:errors {:a "\":2\" is not allowed for :a. Choose one of [:1]"}}))
+        (test-tap tap-conf "foo-tap" "foo.test-plain?a=2") => {:errors [":2 is not allowed for :a. Choose one of [:1]"]}))
+

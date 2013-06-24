@@ -77,6 +77,9 @@
 (defmacro fnk [& args]
   `(gc/fnk ~@args))
 
+(defn graphify [graph-like]
+  (graph/->graph graph-like))
+
 (defn mk-workflow
   ([tmp-dir graph-like] (mk-workflow tmp-dir graph-like {} {}))
   ([tmp-dir graph-like input-mapping output-mapping]
@@ -93,7 +96,7 @@
                                                                 (?- output-tap (apply prev-fn (dissoc args v))))
                                                               (update-in (pfnk/io-schemata prev-fn) [0] assoc v true))))))
                          graph-like (filter (comp graph-like key) output-mapping))
-           graph (graph/->graph graph-like)
+           graph (graphify graph-like)
            input-keywords (set (keys (pfnk/input-schema graph)))
            input-mapping (select-keys input-mapping input-keywords)
            input-keys (mapv (comp symbol name)
@@ -110,6 +113,12 @@
                     (list 'do (concat (list `checkpoint/workflow [tmp-dir])
                                       (mapcat (partial mk-step graph) graph))
                           'state)))))))
+
+(defn fnk-type [fnk]
+  (::fnk-type (meta fnk)))
+  
+(defn fnk-deps [fnk]
+  (keys (pfnk/input-schema fnk)))
 
 (defmacro tmp-dir-fnk [& args]
   (let [f (eval `(gc/fnk ~@args))
