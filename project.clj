@@ -18,8 +18,9 @@
 
                  [cascalog-checkpoint "0.2.0"]
                  
+
                  ;; Command line args processing
-                 [org.clojure/tools.cli "0.2.1"]
+                 [org.clojure/tools.cli "0.2.2"]
                 ]
 
   :profiles {
