@@ -17,7 +17,6 @@
                  [cascalog "1.9.0"]
 
                  [cascalog-checkpoint "0.2.0"]
-                 
 
                  ;; Command line args processing
                  [org.clojure/tools.cli "0.2.2"]
@@ -25,6 +24,7 @@
 
   :profiles {
     :dev {
+          :source-paths ["dev"]
           :plugins [
                      [lein-midje "3.0.1"]]
 

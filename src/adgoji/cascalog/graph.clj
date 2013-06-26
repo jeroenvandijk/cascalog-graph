@@ -80,43 +80,48 @@
 (defn graphify [graph-like]
   (graph/->graph graph-like))
 
+(defn select-nodes
+  "Makes a new graph (see Prismatic's Graph lib) based on the given output mapping. The new graph
+   can be a subset of the original graph when the original graph has nodes that are unneeded
+   to calculate the output
+
+  `(mk-graph-fnk {} {:alpha :alpha-tap})"
+  [graph output-mapping]
+  (graphify (reduce (fn [g [k v]]
+                      (if (seq (steps-dependent g k))
+                        (let [output-node (-> v name (str "-sink") keyword)]
+                          (assoc g output-node (pfnk/fn->fnk (fn [{input-tap k output-tap v}]
+                                                               (?- output-tap input-tap))
+                                                             [{k true v true} true])))
+                        ;; Update old function keep old-schemata plus the output tap schemata
+                        ;; -
+                        ;; (?- ~(symbol (name v)) (apply prev-fn args)
+                        (update-in g [k] (fn [prev-fn]
+                                           (pfnk/fn->fnk (fn [{input-tap k output-tap v :as args}]
+                                                           (?- output-tap (apply prev-fn (dissoc args v))))
+                                                         (update-in (pfnk/io-schemata prev-fn) [0] assoc v true))))))
+                    graph (filter (comp graph key) output-mapping))))
+
 (defn mk-workflow
-  ([tmp-dir graph-like] (mk-workflow tmp-dir graph-like {} {}))
-  ([tmp-dir graph-like input-mapping output-mapping]
-     (let [graph-like (reduce (fn [g [k v]]
-                           (if (seq (steps-dependent g k))
-                             (assoc g v (pfnk/fn->fnk (fn [{input-tap k output-tap v}]
-                                                        (?- output-tap input-tap))
-                                                      [{k true} true]))
-                             ;; Update old function keep old-schemata plus the output tap schemata
-                             ;; -
-                             ;; (?- ~(symbol (name v)) (apply prev-fn args)
-                             (update-in g [k] (fn [prev-fn]
-                                                (pfnk/fn->fnk (fn [{input-tap k output-tap v :as args}]
-                                                                (?- output-tap (apply prev-fn (dissoc args v))))
-                                                              (update-in (pfnk/io-schemata prev-fn) [0] assoc v true))))))
-                         graph-like (filter (comp graph-like key) output-mapping))
-           graph (graphify graph-like)
-           input-keywords (set (keys (pfnk/input-schema graph)))
-           input-mapping (select-keys input-mapping input-keywords)
-           input-keys (mapv (comp symbol name)
-                            (concat (clojure.set/difference input-keywords (keys input-mapping))
-                                    (vals input-mapping)))]
-       (list 'let (vector 'graph# graph)
-             (list `fnk input-keys
+  ([tmp-dir graph]
+     (let [graph (graph/->graph graph)
+           input-keys (map (comp symbol name key) (pfnk/input-schema graph))]
+       (list `fn ['graph#]
+             (list `fnk (vec input-keys)
                    (list
-                    'let (vec (concat
-                               (map (comp symbol name) (flatten (seq input-mapping)))
-                               '[state (atom {})
-                                 save-state (fn [k v] (swap! state assoc k v))
-                                 fetch-state (fn [k] (@state k))]))
+                    'let '[state (atom {})
+                           save-state (fn [k v] (swap! state assoc k v))
+                           fetch-state (fn [k] (@state k))]
                     (list 'do (concat (list `checkpoint/workflow [tmp-dir])
                                       (mapcat (partial mk-step graph) graph))
-                          'state)))))))
+                          'state))))))
+  ([tmp-dir orig-graph output-mapping]
+     (let [graph (select-nodes orig-graph output-mapping)]
+       (mk-workflow tmp-dir graph))))
 
 (defn fnk-type [fnk]
   (::fnk-type (meta fnk)))
-  
+
 (defn fnk-deps [fnk]
   (keys (pfnk/input-schema fnk)))
 
@@ -137,10 +142,15 @@
         m (assoc (meta f) ::fnk-type :final)]
     `(with-meta ~f ~m)))
 
+;; TODO improve function signature
+;; REMOVE input options
 (defn workflow-compile
   ([graph] (workflow-compile "/tmp/cascalog-checkpoint" graph))
   ([tmp-dir graph]
-     (eval (mk-workflow tmp-dir graph))))
+     ((eval (mk-workflow tmp-dir graph)) graph))
+  ([graph input-m output-m] (workflow-compile "/tmp/cascalog-checkpoint" graph {}  output-m))
+  ([tmp-dir graph input-m output-m]
+     ((eval (mk-workflow tmp-dir graph output-m))) graph))94
 
 
 
