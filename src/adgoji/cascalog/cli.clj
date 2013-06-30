@@ -117,33 +117,37 @@
         [success? msg] (validate-options tap-opts)]
     (when-not success?
       (handle-result banner success? msg))
-    (callback (into {} (map (fn [[k v]]
-                              [k (if-let [tap-fn (:tap-fn v)]
-                                   (tap-fn (:args v))
-                                   v)])
-                            tap-opts)))))
+    (let [graph (graph/workflow-compile callback)]
+      (graph (into {} (map (fn [[k v]]
+                                [k (if-let [tap-fn (:tap-fn v)]
+                                     (tap-fn (:args v))
+                                     v)])
+                              tap-opts))))))
 
-(defmethod run-mode :dot [{:keys [fn-like]}]
-  (graph/dot-compile fn-like))
+(defmethod run-mode :dot [{:keys [callback]}]
+  (graph/dot-compile callback))
 
-(defmethod run-mode :preview [{:keys [fn-like]}]
+(defn preview-graph [graph]
   (let [tmp-path (str "/tmp/job-" (java.util.UUID/randomUUID))
         dot-path (str tmp-path ".dot")
         png-path (str tmp-path ".png")
-        dot-str (with-out-str (graph/dot-compile fn-like))
+        dot-str (with-out-str (graph/dot-compile graph))
         _ (spit dot-path dot-str)
-        {dot? :exit error :error} (shell/sh "dot" "-Tpng" dot-path "-o" png-path)]
-    (if dot?
+        {exit-status :exit error :err} (shell/sh "dot" "-Tpng" dot-path "-o" png-path)]
+    (if (zero? exit-status)
       (do (println "opening" png-path "...")
           (shell/sh "open" png-path)
           (System/exit 0))
       (do (println "Error: graphviz not installed?" error)
           (System/exit 1)))))
 
+(defmethod run-mode :preview [{:keys [callback]}]
+  (preview-graph callback))
+
 ;; TODO how can we make the printing of the workflow code pretty?
 ;;   This doesn't work as expected http://clojuredocs.org/clojure_core/clojure.pprint
-(defmethod run-mode :debug [{:keys [fn-like]}]
-  (println (graph/mk-workflow "/tmp/cascalog-checkpoint" fn-like))  )
+(defmethod run-mode :debug [{:keys [callback]}]
+  (println (graph/mk-workflow "/tmp/cascalog-checkpoint" callback))  )
 
 (defmethod run-mode :default [{:keys [opts banner]}]
   (handle-result banner false (str "Error: run mode '" (:mode opts) "' not recognized")))
@@ -153,14 +157,14 @@
 
 ;; FIXME Graph meta contains data over output taps
 (defn run-fn-cmd [job-fn cli-args graph-meta]
-  (let [{:keys [errors banner opts trailing-args] :as cli-validation} (validate-cli-args (derive-io-options job-fn)cli-args)]
+  (let [{:keys [errors banner opts trailing-args] :as cli-validation} (validate-cli-args (derive-io-options job-fn) cli-args)]
     (run-mode {:callback job-fn
                :graph-meta graph-meta
                :opts opts :errors errors :banner banner
                :trailing-args trailing-args})))
 
 (defn run-graph-cmd [graph cli-args graph-meta]
-  (run-fn-cmd (graph/workflow-compile graph) cli-args graph-meta))
+  (run-fn-cmd graph cli-args graph-meta))
 
 (defn run-graph-or-fn-cmd [graph-like output-mapping cli-args]
   (if (fn? graph-like)
