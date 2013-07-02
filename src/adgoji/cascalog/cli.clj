@@ -105,9 +105,16 @@
   (apply handle-result banner (validate-options opts)))
 
 (defn mk-taps [opts {:keys [sink-options source-options] :as bar}]
-  (into {} (map (fn [[k v]] [k (if (and v (.endsWith (name k) "-tap"))
-                                (tap/mk-tap* v {:type (if ((set sink-options) k) :sink :source)})
-                                v)]) opts)))
+  (let [no-sink-options? (empty? sink-options)
+        sink-options-set (set sink-options)]
+    (into {} (map (fn [[k v]] [k (if (and v (.endsWith (name k) "-tap"))
+                                  (tap/mk-tap* v
+                                               {:type
+                                                (cond
+                                                 no-sink-options? :unknown
+                                                 (sink-options-set k) :sink
+                                                 :else :source)})
+                                  v)]) opts))))
 
 (defmethod run-mode :validation [{:keys [opts banner graph-meta]}]
   (validate-options! (mk-taps opts graph-meta) banner))
@@ -117,12 +124,15 @@
         [success? msg] (validate-options tap-opts)]
     (when-not success?
       (handle-result banner success? msg))
-    (let [graph (graph/workflow-compile callback)]
-      (graph (into {} (map (fn [[k v]]
+    (let [args (into {} (map (fn [[k v]]
                                 [k (if-let [tap-fn (:tap-fn v)]
                                      (tap-fn (:args v))
                                      v)])
-                              tap-opts))))))
+                             tap-opts))]
+      (if (fn? callback)
+        (callback args)
+        ((graph/workflow-compile callback) args)))
+))
 
 (defmethod run-mode :dot [{:keys [callback]}]
   (graph/dot-compile callback))
@@ -169,9 +179,13 @@
 (defn run-graph-or-fn-cmd [graph-like output-mapping cli-args]
   (if (fn? graph-like)
     (run-fn-cmd graph-like cli-args {})
-    (run-graph-cmd (graph/select-nodes graph-like output-mapping) cli-args {:sink-options (vals output-mapping)
-                                                                            :source-options (clojure.set/difference (set (keys (pfnk/input-schema graph-like))) (vals output-mapping)) })))
+    (run-graph-cmd (graph/select-nodes graph-like output-mapping)
+                   cli-args
+                   {:sink-options (vals output-mapping)
+                    :source-options (clojure.set/difference (set (keys (pfnk/input-schema graph-like)))
+                                                            (set (vals output-mapping)))})))
 
-(defmacro defjob [job-name graph-like output-mapping]
-  `(cascalog/defmain ~job-name [& args#]
-     (run-graph-or-fn-cmd ~graph-like ~output-mapping args#)))
+(defmacro defjob [job-name graph-like & [output-mapping]]
+  (let [output-mapping (or output-mapping {})]
+   `(cascalog/defmain ~job-name [& args#]
+      (run-graph-or-fn-cmd ~graph-like ~output-mapping args#))))
