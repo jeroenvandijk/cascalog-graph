@@ -120,7 +120,7 @@
 (defmethod mk-tap "hfs-textline" [_]
   (assoc (mk-tap "hfs-seqfile")
     :tap-fn (fn [{:keys [path params]}]
-              (apply cascalog/hfs-textline path params))))
+              (apply cascalog/hfs-textline path (apply concat params)))))
 
 (defmethod mk-tap "stdout" [_]
   {:tap-fn (fn [& _] (cascalog/stdout)) :allowed-types [:sink]})
