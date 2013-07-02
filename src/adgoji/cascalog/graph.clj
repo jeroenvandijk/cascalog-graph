@@ -31,7 +31,6 @@
 (defn steps-dependent [g k]
   (k (dependency-graph g)))
 
-
 (defn graphify [graph-like]
   (graph/->graph graph-like))
 
@@ -88,16 +87,17 @@
 (defmacro final-fnk [& args]
   `(vary-meta (gc/fnk ~@args) assoc ::fnk-type :final))
 
-
-;; IDEA for wrapping all nodes in a graph
-(defn transact [graph before-key before-fnk after-key after-fnk]
+(defn transact
+  "Create a new graph in which the `nodes-after have the intermediate nodes as dependency
+   This can be used to create a sort of transaction, e.g. cleaning up Pail snapshots"
+  [graph nodes-before nodes-after]
   (let [all-nodes (keys graph)
-        adapted-after-fnk (vary-meta after-fnk update-in
-                                     [:plumbing.fnk.pfnk/io-schemata 0]
-                                     (partial apply assoc) (interleave all-nodes (repeat true)))]
-  (assoc graph
-      before-key before-fnk
-      after-key adapted-after-fnk)))
+        io-schemata-all-nodes (interleave all-nodes (repeat true))
+        nodes-after (into {} (map (fn [[k f]] [k
+                                              (vary-meta f update-in
+                                                         [:plumbing.fnk.pfnk/io-schemata 0]
+                                                         (partial apply assoc) io-schemata-all-nodes)]) nodes-after))]
+    (merge nodes-before graph nodes-after)))
 
 (defn serializable? [obj]
   (instance? java.io.Serializable obj))
