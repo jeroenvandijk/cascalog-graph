@@ -45,7 +45,7 @@
   {:pre [(clojure.set/superset? (set (keys graph)) (set (keys output-mapping)))]}
   (graphify (reduce (fn [g [k v]]
                       (if (seq (steps-dependent g k))
-                        (let [output-node (-> v name (str "-sink") keyword)]
+                        (let [output-node (-> k name (str "-sink-step") keyword)]
                           (assoc g output-node (pfnk/fn->fnk (fn [{input-tap k output-tap v}]
                                                                (?- output-tap input-tap))
                                                              [{k true v true} true])))
