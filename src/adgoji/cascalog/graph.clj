@@ -31,9 +31,6 @@
 (defn steps-dependent [g k]
   (k (dependency-graph g)))
 
-;; Duplicate graphs fnk for convenience
-(defmacro fnk [& args]
-  `(gc/fnk ~@args))
 
 (defn graphify [graph-like]
   (graph/->graph graph-like))
@@ -74,15 +71,22 @@
         m (assoc (meta f)  ::fnk-type :tmp-dir)]
     `(with-meta ~f ~m)))
 
+(defn mk-query-fnk [fn]
+  (vary-meta fn assoc ::fnk-type :query))
+
+(defn fn->query-fnk [fn io-schemata]
+  (mk-query-fnk (pfnk/fn->fnk fn io-schemata)))
+
+;; Duplicate graphs fnk for convenience
+(defmacro fnk [& args]
+  `(gc/fnk ~@args))
+
 (defmacro query-fnk [& args]
-  (let [f (eval `(gc/fnk ~@args))
-        m (assoc (meta f) ::fnk-type :query)]
-    `(with-meta ~f ~m)))
+  `(mk-query-fnk (gc/fnk ~@args)))
 
 (defmacro final-fnk [& args]
-  (let [f (eval `(gc/fnk ~@args))
-        m (assoc (meta f) ::fnk-type :final)]
-    `(with-meta ~f ~m)))
+  `(vary-meta (gc/fnk ~@args) assoc ::fnk-type :final))
+
 
 ;; IDEA for wrapping all nodes in a graph
 (defn transact [graph before-key before-fnk after-key after-fnk]
