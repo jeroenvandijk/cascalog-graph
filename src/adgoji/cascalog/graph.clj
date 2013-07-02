@@ -128,6 +128,7 @@
 (defn- mk-runner
   [node workflow]
   (let [log (::log workflow)
+        fs (::fs workflow)
         graph-atom (::graph-atom workflow)
         previous-steps (::previous-steps workflow)
         sem (::sem workflow)
@@ -144,6 +145,7 @@
                          (do (.info log (str "Skipping " node-name "..."))
                              previous-value)
                          (do (.info log (str "Calculating " node-name "..."))
+                             (h/delete fs (::tmp-dir node) true)
                              ((::fn node) @graph-atom)))]
              (swap! graph-atom assoc node-name value)
              (reset! (::value node) value))
@@ -225,7 +227,7 @@
               (some #{:running :unstarted} statuses) (recur)
               :else (.info log "Workflow completed successfully"))))
     ;; TODO make deleting checkpoint dir optional
-    #_(h/delete (::fs workflow) (::checkpoint-dir workflow) true)))
+    (h/delete (::fs workflow) (::checkpoint-dir workflow) true)))
 
 (defn workflow-compile [graph]
   (let [graph (graph/->graph graph)]
