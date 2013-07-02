@@ -1,6 +1,6 @@
 (ns adgoji.cascalog.graph
   ;; from cascalog checkpoint
-  (:use [cascalog.api :only [with-job-conf]])
+  (:use [cascalog.api :only [with-job-conf get-out-fields]])
   (:require [hadoop-util.core :as h]
             [cascalog.conf :as conf]
             [jackknife.core :as u]
@@ -189,8 +189,7 @@
                                              (let [query (f deps)
                                                    ;; Create seqfile with outfields of query to support convenience functions
                                                    ;; such as (select-fields my-tap ["?a"])
-                                                   intermediate-seqfile (apply hfs-seqfile tmp-dir
-                                                                               (apply concat (select-keys query [:outfields])))]
+                                                   intermediate-seqfile (hfs-seqfile tmp-dir :outfields (get-out-fields query))]
                                                ;; Run query and return seqfile
                                                (?- (name k) intermediate-seqfile query)
                                                intermediate-seqfile))
