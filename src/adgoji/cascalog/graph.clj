@@ -53,9 +53,10 @@
                         ;; -
                         ;; (?- ~(symbol (name v)) (apply prev-fn args)
                         (update-in g [k] (fn [prev-fn]
-                                           (pfnk/fn->fnk (fn [{input-tap k output-tap v :as args}]
-                                                           (?- output-tap (apply prev-fn (dissoc args v))))
-                                                         (update-in (pfnk/io-schemata prev-fn) [0] assoc v true))))))
+                                           (let [prev-input-args (keys (pfnk/input-schema prev-fn))]
+                                             (pfnk/fn->fnk (fn [{output-tap v :as args}]
+                                                             (?- output-tap (prev-fn (select-keys args prev-input-args))))
+                                                           (update-in (pfnk/io-schemata prev-fn) [0] assoc v true)))))))
                     graph (filter (comp graph key) output-mapping))))
 
 (defn fnk-type [fnk]
