@@ -1,32 +1,50 @@
 (ns adgoji.cascalog.graph
-  ;; from cascalog checkpoint
-  (:use [cascalog.api :only [with-job-conf get-out-fields]])
-  (:require [hadoop-util.core :as h]
-            [cascalog.conf :as conf]
-            [jackknife.core :as u]
-            [jackknife.seq :as seq])
-  (:import [java.util Collection]
-           [org.apache.log4j Logger]
-           [java.util.concurrent Semaphore]
-           [org.apache.hadoop.fs FileSystem Path]
-           [org.apache.hadoop.conf Configuration]
-           java.io.FileOutputStream
-           java.io.ObjectOutputStream
-           java.io.ObjectInputStream java.io.FileInputStream)
-
   (:require
    [clojure.stacktrace]
    [plumbing.core :as gc]
             [plumbing.graph :as graph]
             [plumbing.fnk.pfnk :as pfnk]
             [cascalog.api :refer [?- hfs-seqfile]]
-            [cascalog.checkpoint  :as checkpoint]))
+            [adgoji.cascalog.checkpoint  :as checkpoint]))
+
+(defn mk-typed-fnk [f t]
+  (vary-meta fn assoc ::fnk-type t))
+
+(defn fnk-type [fnk]
+  (::fnk-type (meta fnk)))
+
+(defn fn->typed-fnk [fn io-schemata t]
+  (mk-typed-fnk (pfnk/fn->fnk fn io-schemata) t))
+
+;; Duplicate graphs fnk for convenience
+(defmacro fnk [& args]
+  `(gc/fnk ~@args))
+
+(defmacro query-fnk [& args]
+  `(mk-typed-fnk (gc/fnk ~@args) :query))
+
+;; TODO clean up this macro as well, use vary-meta
+(defmacro tmp-dir-fnk [& args]
+  (vary-meta (mk-typed-fnk (gc/fnk ~@args) :tmp-dir) update-in [::graph/])
+  (let [f (eval `)
+        schemata (update-in (pfnk/io-schemata f) [0] dissoc :tmp-dir)
+        f (pfnk/fn->fnk f schemata)
+        m (assoc (meta f)  ::fnk-type :tmp-dir)]
+    `(with-meta ~f ~m)))
+
+;; DEPRECATED replaced by transact
+(defmacro final-fnk [& args]
+  `(mk-typed-fnk (gc/fnk ~@args) :final))
+
+
+(defn fnk-input-keys [pfnk-val]
+  (keys (pfnk/input-schema pfnk-val)))
 
 (defn dependency-graph [g]
   (reduce (fn [acc [k v]]
             (reduce (fn [acc0 dep]
                       (update-in acc0 [dep] (fnil conj []) k)) acc
-                      (keys (pfnk/input-schema v)))) {} g))
+                      (fnk-input-keys v))) {} g))
 
 (defn steps-dependent [g k]
   (k (dependency-graph g)))
@@ -52,40 +70,11 @@
                         ;; -
                         ;; (?- ~(symbol (name v)) (apply prev-fn args)
                         (update-in g [k] (fn [prev-fn]
-                                           (let [prev-input-args (keys (pfnk/input-schema prev-fn))]
+                                           (let [prev-input-args (fnk-input-keys prev-fn)]
                                              (pfnk/fn->fnk (fn [{output-tap v :as args}]
                                                              (?- output-tap (prev-fn (select-keys args prev-input-args))))
                                                            (update-in (pfnk/io-schemata prev-fn) [0] assoc v true)))))))
                     graph (filter (comp graph key) output-mapping))))
-
-(defn fnk-type [fnk]
-  (::fnk-type (meta fnk)))
-
-(defn fnk-deps [fnk]
-  (keys (pfnk/input-schema fnk)))
-
-(defmacro tmp-dir-fnk [& args]
-  (let [f (eval `(gc/fnk ~@args))
-        schemata (update-in (pfnk/io-schemata f) [0] dissoc :tmp-dir)
-        f (pfnk/fn->fnk f schemata)
-        m (assoc (meta f)  ::fnk-type :tmp-dir)]
-    `(with-meta ~f ~m)))
-
-(defn mk-query-fnk [fn]
-  (vary-meta fn assoc ::fnk-type :query))
-
-(defn fn->query-fnk [fn io-schemata]
-  (mk-query-fnk (pfnk/fn->fnk fn io-schemata)))
-
-;; Duplicate graphs fnk for convenience
-(defmacro fnk [& args]
-  `(gc/fnk ~@args))
-
-(defmacro query-fnk [& args]
-  `(mk-query-fnk (gc/fnk ~@args)))
-
-(defmacro final-fnk [& args]
-  `(vary-meta (gc/fnk ~@args) assoc ::fnk-type :final))
 
 (defn transact
   "Create a new graph in which the `nodes-after have the intermediate nodes as dependency
@@ -99,90 +88,13 @@
                                                          (partial apply assoc) io-schemata-all-nodes)]) nodes-after))]
     (merge nodes-before graph nodes-after)))
 
-(defn serializable? [obj]
-  (instance? java.io.Serializable obj))
-
-(defn serialize-state [state-file state]
-  (let [serializable-state (into {} (filter (comp serializable? val) state))]
-    (with-open [file-out (FileOutputStream. state-file)
-                object-out (ObjectOutputStream. file-out)]
-      (.writeObject object-out serializable-state))))
-
-(defn deserialize-state [state-file]
-  (with-open [file-in (FileInputStream. state-file)
-              object-in (ObjectInputStream. file-in)]
-    (.readObject object-in)))
-
-(defstruct WorkflowNode ::tmp-dirs ::fn ::deps ::error ::value)
-(defstruct Workflow ::fs ::checkpoint-dir ::graph-atom ::previous-steps ::sem ::log)
-
-(defn mk-workflow [checkpoint-dir initial-graph]
-  (let [fs (h/filesystem)
-        log (Logger/getLogger "checkpointed-workflow")
-        sem (Semaphore. 0)
-        state-file (clojure.java.io/file (str checkpoint-dir "/state.bin"))
-        previous-steps (when (.exists state-file) (deserialize-state state-file))]
-    (h/mkdirs fs checkpoint-dir)
-    (struct Workflow fs checkpoint-dir (atom initial-graph) previous-steps sem log)))
-
-(defn- mk-runner
-  [node workflow]
-  (let [log (::log workflow)
-        fs (::fs workflow)
-        graph-atom (::graph-atom workflow)
-        previous-steps (::previous-steps workflow)
-        sem (::sem workflow)
-        node-name (::name node)
-        config conf/*JOB-CONF*]
-    (Thread.
-     (fn []
-       (with-job-conf config
-         (try
-           ;; Check previous value, doesn't take into account changes graph
-           ;; removing checkpoint dir is the only option for these case
-           ;; TODO smarter graph checking
-           (let [value (if-let [previous-value (get previous-steps node-name)]
-                         (do (.info log (str "Skipping " node-name "..."))
-                             previous-value)
-                         (do (.info log (str "Calculating " node-name "..."))
-                             (h/delete fs (::tmp-dir node) true)
-                             ((::fn node) @graph-atom)))]
-             (swap! graph-atom assoc node-name value)
-             (reset! (::value node) value))
-           (reset! (::status node) :successful)
-           (catch Throwable t
-             (.error log (str "Component failed " node-name) t)
-             (reset! (::error node) t)
-             (reset! (::status node) :failed))
-           (finally (.release sem))))))))
-
-(defn- fail-workflow!
-  [workflow nodes-map]
-  (let [log (::log workflow)
-        nodes (vals nodes-map)
-        failed-nodes (filter (comp deref ::error) nodes)
-        succesful-nodes (filter (comp (partial = :successful) deref ::status) nodes)
-        running-nodes (filter (comp (partial = :running) deref ::status) nodes)
-        threads (map ::runner-thread running-nodes)]
-    (.info log "Workflow failed - interrupting components")
-    (doseq [t threads] (.interrupt t))
-    (.info log "Waiting for running components to finish")
-    (doseq [t threads] (.join t))
-    (.info log "Serializing succesful nodes")
-    (serialize-state (str (::checkpoint-dir workflow) "/state.bin")
-                     (into {} (map (fn [n] [(::name n) @(::value n)]) succesful-nodes)))
-    ;; TODO we would like to print the Exceptions that help us fix bugs, but it is unclear
-    ;;      how to reach those Exceptions (e.g. TupleExceptions)
-    (u/throw-runtime (str "Workflow failed during " (clojure.string/join ", " (map ::name failed-nodes))))))
+;;; Graph compilation
 
 (defn graph->nodes [workflow graph]
-  (let [previous-steps (::previous-steps workflow)
-        steps (set (keys graph))]
+  (let [steps (set (keys graph))]
     (into {}
           (map (fn [[k f]]
                  (let [node-deps (filter steps (keys (pfnk/input-schema f)))
-                       tmp-dir (str (::checkpoint-dir workflow) "/" (name k))
-
                        ;; TODO can we do without the fnk macros, only needed for this:
                        f-wrapped (condp = (fnk-type f)
                                    :tmp-dir (fn [deps]
@@ -195,45 +107,15 @@
                                                ;; Run query and return seqfile
                                                (?- (name k) intermediate-seqfile query)
                                                intermediate-seqfile))
-                                   f)
-                       node
-                       (struct-map WorkflowNode
-                         ::name k
-                         ::fn f-wrapped
-                         ::status (atom :unstarted)
-                         ::error (atom nil)
-                         ::value (atom nil)
-                         ::tmp-dir tmp-dir
-                         ::deps node-deps)]
-                   [k (assoc node ::runner-thread (mk-runner node workflow))]))
+                                   f)]
+                   [k (checkpoint/mk-node {:name k :fn f-wrapped :tmp-dir tmp-dir :deps node-deps})]))
                graph))))
 
-(defn exec-workflow! [workflow nodes]
-  ;; run checkpoint as graph
-  (let [log (::log workflow)]
-    (loop []
-      ;; Start nodes t
-      (doseq [[name node] nodes
-              :when (and (= :unstarted @(::status node))
-                         (every? (fn [[_ n]] (= :successful @(::status n)))
-                                 (select-keys nodes (::deps node))))]
-        (reset! (::status node) :running)
-        (.start (::runner-thread node)))
-      ;; Wait for nodes to finish
-      (.acquire (::sem workflow))
-      ;; Check for failures
-      (let [statuses (set (map (comp deref ::status val) nodes))]
-        (cond (contains? statuses :failed) (fail-workflow! workflow nodes)
-              (some #{:running :unstarted} statuses) (recur)
-              :else (.info log "Workflow completed successfully"))))
-    ;; TODO make deleting checkpoint dir optional
-    (h/delete (::fs workflow) (::checkpoint-dir workflow) true)))
-
-(defn workflow-compile [graph]
+(defn workflow-compile [graph & [options]]
   (let [graph (graph/->graph graph)]
     (pfnk/fn->fnk (fn [{:keys [] :as graph-args}]
-                    (let [workflow (mk-workflow "/tmp/cascalog-checkpoint-graph" graph-args)]
-                      (exec-workflow! workflow (graph->nodes workflow graph)))) (pfnk/io-schemata graph))))
+                    (let [workflow (checkpoint/mk-workflow "/tmp/cascalog-checkpoint-graph" graph-args options)]
+                      (checkpoint/exec-workflow! workflow (graph->nodes workflow graph)))) (pfnk/io-schemata graph))))
 
 ;; Adopted from https://github.com/stuartsierra/flow/blob/master/src/com/stuartsierra/flow.clj#L138
 (defn dot-compile
@@ -250,6 +132,6 @@
     (println "digraph" (pr-str (name graph-name)) "{")
     (when (map? graph)
       (doseq [sym (keys graph)
-              dep (when-let [node (graph sym)] (keys (pfnk/input-schema node)))]
+              dep (when-let [node (graph sym)] (fnk-input-keys node))]
         (println "  " (pr-str (name dep)) "->" (pr-str (name sym)) ";")))
     (println "}")))

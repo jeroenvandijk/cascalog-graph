@@ -119,7 +119,7 @@
 (defmethod run-mode :validation [{:keys [opts banner graph-meta]}]
   (validate-options! (mk-taps opts graph-meta) banner))
 
-(defmethod run-mode :execute [{:keys [opts banner callback graph-meta]}]
+(defmethod run-mode :execute [{:keys [opts banner callback graph-meta workflow-options]}]
   (let [tap-opts (mk-taps opts graph-meta)
         [success? msg] (validate-options tap-opts)]
     (when-not success?
@@ -131,7 +131,7 @@
                              tap-opts))]
       (if (fn? callback)
         (callback args)
-        ((graph/workflow-compile callback) args)))
+        ((graph/workflow-compile callback workflow-options) args)))
 ))
 
 (defmethod run-mode :dot [{:keys [callback]}]
@@ -162,12 +162,9 @@
 (defmethod run-mode :default [{:keys [opts banner]}]
   (handle-result banner false (str "Error: run mode '" (:mode opts) "' not recognized")))
 
-(defn derive-io-options [pfnk-val]
-  (keys (pfnk/input-schema pfnk-val)))
-
 ;; FIXME Graph meta contains data over output taps
 (defn run-fn-cmd [job-fn cli-args graph-meta]
-  (let [{:keys [errors banner opts trailing-args] :as cli-validation} (validate-cli-args (derive-io-options job-fn) cli-args)]
+  (let [{:keys [errors banner opts trailing-args] :as cli-validation} (validate-cli-args (graph/fnk-input-keys job-fn) cli-args)]
     (run-mode {:callback job-fn
                :graph-meta graph-meta
                :opts opts :errors errors :banner banner
@@ -176,6 +173,10 @@
 (defn run-graph-cmd [graph cli-args graph-meta]
   (run-fn-cmd graph cli-args graph-meta))
 
+;; Put workflow options somewhere here
+
+
+;; Move select-nodes out of here, no business of the cli namespace
 (defn run-graph-or-fn-cmd [graph-like output-mapping cli-args]
   (if (fn? graph-like)
     (run-fn-cmd graph-like cli-args {})
