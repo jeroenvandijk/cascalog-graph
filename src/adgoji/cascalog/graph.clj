@@ -233,7 +233,10 @@
   (let [graph (graph/->graph graph)]
     (pfnk/fn->fnk (fn [{:keys [] :as graph-args}]
                     (let [workflow (mk-workflow "/tmp/cascalog-checkpoint-graph" graph-args)]
-                      (exec-workflow! workflow (graph->nodes workflow graph)))) (pfnk/io-schemata graph))))
+                      (exec-workflow! workflow (graph->nodes workflow graph))
+                      ;; return value of graph nodes
+                      @(::graph-atom workflow)
+                      )) (pfnk/io-schemata graph))))
 
 ;; Adopted from https://github.com/stuartsierra/flow/blob/master/src/com/stuartsierra/flow.clj#L138
 (defn dot-compile
