@@ -1,5 +1,6 @@
 (ns adgoji.cascalog.cli
   (:require [adgoji.cascalog.graph :as graph]
+            [adgoji.cascalog.checkpoint :as checkpoint]
             [adgoji.cascalog.cli.tap :as tap]
             [cascalog.api :as cascalog]
 
@@ -154,10 +155,9 @@
 (defmethod run-mode :preview [{:keys [callback]}]
   (preview-graph callback))
 
-;; TODO how can we make the printing of the workflow code pretty?
-;;   This doesn't work as expected http://clojuredocs.org/clojure_core/clojure.pprint
+;; TODO Add dependency graph here?
 (defmethod run-mode :debug [{:keys [callback]}]
-  (println (graph/mk-workflow "/tmp/cascalog-checkpoint" callback))  )
+  (println "doesn't make sense anymore? what do you want to see?"))
 
 (defmethod run-mode :default [{:keys [opts banner]}]
   (handle-result banner false (str "Error: run mode '" (:mode opts) "' not recognized")))

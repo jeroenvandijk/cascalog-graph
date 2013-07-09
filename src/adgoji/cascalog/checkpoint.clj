@@ -1,4 +1,4 @@
-(ns cascalog.checkpoint
+(ns adgoji.cascalog.checkpoint
   "Alpha!"
   ;; from cascalog checkpoint
   (:use [cascalog.api :only [with-job-conf get-out-fields]])
@@ -72,7 +72,7 @@
              (reset! (::status node) :failed))
            (finally (.release sem))))))))
 
-(defn mk-node [{:keys [name fn tmp-dir deps]}]
+(defn mk-node [workflow {:keys [name fn tmp-dir deps]}]
   {:pre [name fn tmp-dir deps]}
   (let [node
         (struct-map WorkflowNode
