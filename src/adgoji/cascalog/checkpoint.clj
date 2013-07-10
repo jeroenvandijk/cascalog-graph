@@ -41,7 +41,8 @@
   (let [fs (h/filesystem)
         log (Logger/getLogger "checkpointed-workflow")
         sem (Semaphore. 0)
-        previous-steps (deserialize-state fs (str checkpoint-dir "/state.bin"))]
+        previous-steps (deserialize-state fs (str checkpoint-dir "/state.bin"))
+        options (merge {:cleanup-checkpoint-dir? true} options)]
     (h/mkdirs fs checkpoint-dir)
     (struct Workflow fs checkpoint-dir (atom initial-graph) previous-steps sem log options)))
 
@@ -142,6 +143,6 @@
                       (.info log "Workflow completed successfully")
                       (run-success-callback workflow)
                       ))))
-    ;; TODO make deleting checkpoint dir optional
-    (.info log "Cleaning checkpoint dir")
-    (h/delete (::fs workflow) (::checkpoint-dir workflow) true)))
+    (when (get-in workflow [::options :cleanup-checkpoint-dir?])
+      (.info log "Cleaning checkpoint dir")
+      (h/delete (::fs workflow) (::checkpoint-dir workflow) true))))
