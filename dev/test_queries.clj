@@ -1,7 +1,7 @@
 (ns test-queries
   (:use cascalog.api adgoji.cascalog.graph adgoji.cascalog.cli)
-  (:require [adgoji.cascalog.cli.tap :as tap])
-  (:gen-class))
+  (:require [adgoji.cascalog.cli.tap :as tap]
+            [adgoji.cascalog.graph :as graph]))
 
 (defmethod tap/mk-tap "inline" [_]
   {:tap-fn (fn [{:keys [path params] :as args}]
@@ -33,5 +33,5 @@
                                     (gamma ?idx ?gamma)
                                     (delta ?idx ?delta)
                                     (+ ?gamma ?delta :> ?epsilon)))})
-
-(defjob foo flow  {:gamma :gamma-output-tap})
+;; lein run -m test-queries/foo --beta-tap "inline:[[0 1]]" --alpha-tap "inline:[[0 1]]" --gamma-output-tap stdout 
+(defjob foo (graph/select-nodes flow {:gamma :gamma-output-tap}))
