@@ -132,8 +132,9 @@
                              tap-opts))]
       (if (fn? callback)
         (callback args) ;; Add job options here as well?
-        ((graph/workflow-compile callback job-options) args)))
-))
+        ((graph/workflow-compile callback job-options) args))
+      ;; Return nil
+      nil)))
 
 (defmethod run-mode :dot [{:keys [callback]}]
   (graph/dot-compile callback))
