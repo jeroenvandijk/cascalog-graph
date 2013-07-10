@@ -6,6 +6,7 @@
    [plumbing.graph :as graph]
    [plumbing.fnk.pfnk :as pfnk]
    [cascalog.api :as cas]
+   [cascalog.rules :as cas-rules]
    [adgoji.cascalog.checkpoint  :as checkpoint]))
 
 (defn fnk-type [fnk]
@@ -132,7 +133,10 @@
                                                    ;; Create seqfile with outfields of query to support convenience functions
                                                    ;; such as (select-fields my-tap ["?a"])
                                                    intermediate-seqfile
-                                                   (cas/hfs-seqfile tmp-dir :outfields (cas/get-out-fields query))]
+                                                   (cas/hfs-seqfile tmp-dir
+                                                                    ;; TODO select out fields from generator, bit clumpsy
+                                                                    :outfields (when (cas-rules/generator-selector query)
+                                                                                 (cas/get-out-fields query)))]
                                                ;; Run query and return seqfile
                                                (cas/?- (name k) intermediate-seqfile query)
                                                intermediate-seqfile))
