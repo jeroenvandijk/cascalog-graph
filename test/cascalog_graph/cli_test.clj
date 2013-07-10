@@ -1,11 +1,12 @@
 (ns cascalog-graph.cli-test
-  (:require [adgoji.cascalog.cli :as g :refer :all]
+  (:require [adgoji.cascalog.graph :as g]
+            [adgoji.cascalog.cli.tap :as tap]
             [cascalog.api :as cascalog :refer :all]
-            [adgoji.cascalog.cli :as cli]
+            [adgoji.cascalog.cli :as cli :refer :all]
             [midje.sweet :refer :all]))
 
 (tabular "destructuring tap-uri's"
-         (fact (parse-tap-str ?tap-str) => {:format ?scheme :params ?params :path ?path})
+         (fact (tap/parse-tap-str ?tap-str) => {:format ?scheme :params ?params :path ?path})
          ?tap-str                                   ?scheme    ?path                     ?params
          "hfs-json:path/to/tap"                     "hfs-json" "path/to/tap"             {}
          "path/to/tap.hfs-json"                     "hfs-json" "path/to/tap.hfs-json"    {}
@@ -19,9 +20,9 @@
 
 
 (tabular
- "`validate-tap-constructor "
+ "Asserting incorrect tap configurations fails"
  (fact
-  (assert-tap-config ?config) => ?res)
+  (tap/assert-tap-config ?config) => ?res)
  ?config ?res
  {} (throws AssertionError)
  {:tap-fn (fn [] ) :allowed-types []} (throws AssertionError)
@@ -29,37 +30,31 @@
  {:tap-fn (fn []) :allowed-types [:source :sink]}
  )
 
-(fact ""
-      (assert-tap-config {:tap-fn (fn []) :allowed-types [:source :sink]}) =not=>
+(fact "Asserting correct tap configurations does not fail"
+      (tap/assert-tap-config {:tap-fn (fn []) :allowed-types [:source :sink]}) =not=>
       (throws AssertionError))
 
 (tabular
  "mk-tap works for defaults"
  (fact
-  (assert-tap-config (cli/mk-tap ?format)) =not=> (throws AssertionError))
+  (tap/assert-tap-config (tap/mk-tap ?format)) =not=> (throws AssertionError))
  ?format
  "hfs-seqfile"
  "hfs-textline"
  "stdout")
 
-
 (fact
  "Unsupported options"
- (unsupported-options-error {:foo {:doc {:bar "bar doc" :baz :doc}}} {:z 1 :x 2}) =>
+ (tap/unsupported-options-error {:foo {:doc {:bar "bar doc" :baz :doc}}} {:z 1 :x 2}) =>
  "the parameters \"z\",\"x\" are not supported. Choose from foo=bar|baz")
 
-(defn test-tap [config name uri]
-  (dissoc (cli/mk-tap* config name uri) :validation-fn))
+(defn test-tap [config uri]
+  (dissoc (tap/mk-tap* config uri {}) :validation-fn :tap-fn))
 
-(fact "Should parse params correctly"
-      (test-tap  {:options { :a { :vals { "1" "an option"}}}} "foo-tap" "foo.test-plain?a=1")
-       => {:path "foo.test-plain" :type :unknown :params { :a "1"}})
-
-(let [tap-conf {:params-transform cli/keywordize-options
-                :options { :a { :vals { :1 "an option"}}}}]
+(let [tap-conf {:options { :a { :vals { :1 "an option"}}}}]
   (fact "applies params-transform correctly"
-        (test-tap tap-conf "foo-tap" "foo.test-plain?a=1") => {:path "foo.test-plain" :type :unknown :params { :a :1}})
+        (:args (test-tap tap-conf "foo.test-plain?a=1")) => {:path "foo.test-plain" :params { :a :1} :format "test-plain"})
   (fact "complains about invalid options"
-        (test-tap tap-conf "foo-tap" "foo.test-plain?c=1") => {:errors {:c "is not a valid option"}})
+        (tap/validate-tap-options (test-tap tap-conf "foo.test-plain?c=1")) => ":c is not a valid option")
   (fact "complains about invalid option values"
-        (test-tap tap-conf "foo-tap" "foo.test-plain?a=2") => {:errors {:a "\":2\" is not allowed for :a. Choose one of [:1]"}}))
+        (tap/validate-tap-options (test-tap tap-conf "foo.test-plain?a=2")) => ":2 is not allowed for :a. Choose one of [:1]"))
