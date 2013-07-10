@@ -93,13 +93,13 @@
 (defn run-success-callback [workflow]
   (when-let [callback (get-in workflow [::options :after-success])]
     (.info (::log workflow) "Running success callback")
-    (callback {})))
+    (callback @(::graph-atom workflow))
+    (.info (::log workflow) "Successfully run callback")))
 
 (defn run-failure-callback [workflow error]
   (when-let [callback (get-in workflow [::options :after-failure])]
     (.info (::log workflow) "Running failure callback")
     (callback {:error error})))
-
 
 (defn- fail-workflow!
   [workflow nodes-map]

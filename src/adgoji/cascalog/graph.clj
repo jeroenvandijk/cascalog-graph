@@ -129,11 +129,12 @@
                    [k (checkpoint/mk-node workflow {:name k :fn f-wrapped :tmp-dir tmp-dir :deps node-deps})]))
                graph))))
 
-(defn workflow-compile [graph & [options]]
-  (let [graph (graph/->graph graph)]
+(defn workflow-compile [graph & [{:keys [serial-order? checkpoint-dir] :as options}]]
+  (let [graph (graph/->graph graph)
+        checkpoint-dir (or checkpoint-dir "/tmp/cascalog-graph-checkpoint")]
     (pfnk/fn->fnk (fn [{:keys [] :as graph-args}]
-                    (let [workflow (checkpoint/mk-workflow "/tmp/cascalog-checkpoint-graph" graph-args options)]
-                      (checkpoint/exec-workflow! workflow (graph->nodes workflow graph false))
+                    (let [workflow (checkpoint/mk-workflow checkpoint-dir graph-args options)]
+                      (checkpoint/exec-workflow! workflow (graph->nodes workflow graph serial-order?))
                       @(::checkpoint/graph-atom workflow)))
                   (pfnk/io-schemata graph))))
 

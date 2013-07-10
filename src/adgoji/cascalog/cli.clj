@@ -13,7 +13,7 @@
 ;; to visualize, validate and debug a job. These options can be extended by expanding the multimethod run-mode.
 ;; The different run modes are defined below.
 
-(defmulti run-mode (fn [{:keys [opts]}] (:mode opts)))
+(defmulti run-mode (fn [{:keys [mode]}] mode))
 
 (defn mk-cli-arg [graph-option]
   (let [opt-name (name graph-option)
@@ -120,8 +120,8 @@
 (defmethod run-mode :validation [{:keys [opts banner graph-meta]}]
   (validate-options! (mk-taps opts graph-meta) banner))
 
-(defmethod run-mode :execute [{:keys [opts banner callback graph-meta workflow-options]}]
-  (let [tap-opts (mk-taps opts graph-meta)
+(defmethod run-mode :execute [{:keys [input-options banner callback job-options]}]
+  (let [tap-opts (mk-taps input-options (meta callback))
         [success? msg] (validate-options tap-opts)]
     (when-not success?
       (handle-result banner success? msg))
@@ -131,8 +131,8 @@
                                      v)])
                              tap-opts))]
       (if (fn? callback)
-        (callback args)
-        ((graph/workflow-compile callback workflow-options) args)))
+        (callback args) ;; Add job options here as well?
+        ((graph/workflow-compile callback job-options) args)))
 ))
 
 (defmethod run-mode :dot [{:keys [callback]}]
@@ -163,11 +163,12 @@
   (handle-result banner false (str "Error: run mode '" (:mode opts) "' not recognized")))
 
 ;; FIXME Graph meta contains data over output taps
-(defn run-fn-cmd [job-fn cli-args graph-meta]
+(defn run-fn-cmd [job-fn cli-args job-options]
   (let [{:keys [errors banner opts trailing-args] :as cli-validation} (validate-cli-args (graph/fnk-input-keys job-fn) cli-args)]
     (run-mode {:callback job-fn
-               :graph-meta graph-meta
-               :opts opts :errors errors :banner banner
+               :mode (:mode opts)
+               :input-options opts :errors errors :banner banner
+               :job-options job-options
                :trailing-args trailing-args})))
 
 (defn run-graph-cmd [graph cli-args graph-meta]
@@ -177,16 +178,11 @@
 
 
 ;; Move select-nodes out of here, no business of the cli namespace
-(defn run-graph-or-fn-cmd [graph-like output-mapping cli-args]
+(defn run-graph-or-fn-cmd [graph-like options cli-args]
   (if (fn? graph-like)
-    (run-fn-cmd graph-like cli-args {})
-    (run-graph-cmd (graph/select-nodes graph-like output-mapping)
-                   cli-args
-                   {:sink-options (vals output-mapping)
-                    :source-options (clojure.set/difference (set (keys (pfnk/input-schema graph-like)))
-                                                            (set (vals output-mapping)))})))
+    (run-fn-cmd graph-like cli-args options)
+    (run-graph-cmd graph-like cli-args options)))
 
-(defmacro defjob [job-name graph-like & [output-mapping]]
-  (let [output-mapping (or output-mapping {})]
-   `(cascalog/defmain ~job-name [& args#]
-      (run-graph-or-fn-cmd ~graph-like ~output-mapping args#))))
+(defmacro defjob [job-name graph-like & {:keys [] :as options}]
+  `(cascalog/defmain ~job-name [& args#]
+     (run-graph-or-fn-cmd ~graph-like ~options args#)))
