@@ -105,7 +105,7 @@
 (defn validate-options! [opts banner]
   (apply handle-result banner (validate-options opts)))
 
-(defn mk-taps [opts {:keys [sink-options source-options] :as bar}]
+(defn mk-taps [opts {:keys [sink-options source-options]}]
   (let [no-sink-options? (empty? sink-options)
         sink-options-set (set sink-options)]
     (into {} (map (fn [[k v]] [k (if (and v (.endsWith (name k) "-tap"))
@@ -121,7 +121,7 @@
   (validate-options! (mk-taps opts graph-meta) banner))
 
 (defmethod run-mode :execute [{:keys [input-options banner callback job-options]}]
-  (let [tap-opts (mk-taps input-options (meta callback))
+  (let [tap-opts (mk-taps input-options (graph/tap-options callback))
         [success? msg] (validate-options tap-opts)]
     (when-not success?
       (handle-result banner success? msg))
@@ -173,8 +173,6 @@
 
 (defn run-graph-cmd [graph cli-args graph-meta]
   (run-fn-cmd graph cli-args graph-meta))
-
-;; Put workflow options somewhere here
 
 
 ;; Move select-nodes out of here, no business of the cli namespace

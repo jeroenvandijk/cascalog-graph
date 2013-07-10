@@ -19,6 +19,9 @@
 
 (def fn->query-fnk (partial fn->typed-fnk :query))
 
+(defn- fn->output-fnk [f io-schemata output-tap]
+  (vary-meta (pfnk/fn->fnk f io-schemata) assoc ::output-tap output-tap))
+
 ;; Duplicate graphs fnk for convenience
 (defmacro fnk [& args]
   `(gc/fnk ~@args))
@@ -63,17 +66,19 @@
   (graphify (reduce (fn [g [k v]]
                       (if (seq (steps-dependent g k))
                         (let [output-node (-> k name (str "-sink-step") keyword)]
-                          (assoc g output-node (pfnk/fn->fnk (fn [{input-tap k output-tap v}]
+                          (assoc g output-node (fn->output-fnk (fn [{input-tap k output-tap v}]
                                                                (cas/?- output-tap input-tap))
-                                                             [{k true v true} true])))
+                                                             [{k true v true} true]
+                                                             v)))
                         ;; Update old function keep old-schemata plus the output tap schemata
                         ;; -
                         ;; (?- ~(symbol (name v)) (apply prev-fn args)
                         (update-in g [k] (fn [prev-fn]
                                            (let [prev-input-args (fnk-input-keys prev-fn)]
-                                             (pfnk/fn->fnk (fn [{output-tap v :as args}]
+                                             (fn->output-fnk (fn [{output-tap v :as args}]
                                                              (cas/?- output-tap (prev-fn (select-keys args prev-input-args))))
-                                                           (update-in (pfnk/io-schemata prev-fn) [0] assoc v true)))))))
+                                                             (update-in (pfnk/io-schemata prev-fn) [0] assoc v true)
+                                                             v))))))
                     graph (filter (comp graph key) output-mapping))))
 
 (defn transact
@@ -104,6 +109,12 @@
               (assoc acc k (filter steps (fnk-input-keys f))))
             {} graph)))
 
+(defn tap-options [graph]
+  (let [all-options (set (keys (pfnk/input-schema graph)))
+        sink-options (set (remove nil? (map (comp ::output-tap meta) (vals graph))))]
+    {:sink-options sink-options
+     :source-options (clojure.set/difference all-options sink-options)}))
+
 (defn graph->nodes [workflow graph serial-order?]
   (let [deps-mapping (if serial-order?
                        (deps-serial graph)
@@ -120,8 +131,8 @@
                                              (let [query (f deps)
                                                    ;; Create seqfile with outfields of query to support convenience functions
                                                    ;; such as (select-fields my-tap ["?a"])
-                                                   intermediate-seqfile (cas/hfs-seqfile tmp-dir
-                                                                                         :outfields (cas/get-out-fields query))]
+                                                   intermediate-seqfile
+                                                   (cas/hfs-seqfile tmp-dir :outfields (cas/get-out-fields query))]
                                                ;; Run query and return seqfile
                                                (cas/?- (name k) intermediate-seqfile query)
                                                intermediate-seqfile))
