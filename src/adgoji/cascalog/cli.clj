@@ -106,14 +106,13 @@
   (apply handle-result banner (validate-options opts)))
 
 (defn mk-taps [opts {:keys [sink-options source-options]}]
-  (let [no-sink-options? (empty? sink-options)
-        sink-options-set (set sink-options)]
+  (let [no-sink-options? (empty? sink-options)]
     (into {} (map (fn [[k v]] [k (if (and v (.endsWith (name k) "-tap"))
                                   (tap/mk-tap* v
                                                {:type
                                                 (cond
                                                  no-sink-options? :unknown
-                                                 (sink-options-set k) :sink
+                                                 ((set sink-options) k) :sink
                                                  :else :source)})
                                   v)]) opts))))
 
@@ -121,7 +120,7 @@
   (validate-options! (mk-taps opts graph-meta) banner))
 
 (defmethod run-mode :execute [{:keys [input-options banner callback job-options]}]
-  (let [tap-opts (mk-taps input-options (graph/tap-options callback))
+  (let [tap-opts (mk-taps input-options (if-not (fn? callback) (graph/tap-options callback)))
         [success? msg] (validate-options tap-opts)]
     (when-not success?
       (handle-result banner success? msg))
