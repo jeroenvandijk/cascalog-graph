@@ -162,8 +162,7 @@
 (defmethod run-mode :default [{:keys [opts banner]}]
   (handle-result banner false (str "Error: run mode '" (:mode opts) "' not recognized")))
 
-;; FIXME Graph meta contains data over output taps
-(defn run-fn-cmd [job-fn cli-args job-options]
+(defn run-cmd [job-fn job-options cli-args]
   (let [{:keys [errors banner opts trailing-args] :as cli-validation} (validate-cli-args (graph/fnk-input-keys job-fn) cli-args)]
     (run-mode {:callback job-fn
                :mode (:mode opts)
@@ -171,16 +170,6 @@
                :job-options job-options
                :trailing-args trailing-args})))
 
-(defn run-graph-cmd [graph cli-args graph-meta]
-  (run-fn-cmd graph cli-args graph-meta))
-
-
-;; Move select-nodes out of here, no business of the cli namespace
-(defn run-graph-or-fn-cmd [graph-like options cli-args]
-  (if (fn? graph-like)
-    (run-fn-cmd graph-like cli-args options)
-    (run-graph-cmd graph-like cli-args options)))
-
 (defmacro defjob [job-name graph-like & {:keys [] :as options}]
   `(cascalog/defmain ~job-name [& args#]
-     (run-graph-or-fn-cmd ~graph-like ~options args#)))
+     (run-cmd ~graph-like ~options args#)))
