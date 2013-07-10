@@ -104,7 +104,8 @@
                                     :update "Updates"
                                     :replace "Replaces the "}}}
    :validation (fn [{:keys [path params credentials type] :as foo}]
-                 (let [exists? (hdfs/file-exists? path)]
+                 ;; TODO doesn't work for remote paths (yet!!)
+                 #_(let [exists? (hdfs/file-exists? path)]
                    (cond
                     (and (= type :sink)
                          (not (#{:update :replace} (:sinkmode params)))
