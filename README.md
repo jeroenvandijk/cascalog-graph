@@ -26,15 +26,15 @@ Cascalog.checkpoint is great for when you start to build complex flows. It makes
 
 Cascalog-Graph is on [Clojars](https://clojars.org/adgoji/cascalog-graph)
 
-Latest release is 0.2.2
+Latest release is 0.2.4
 
 [Leiningen](https://github.com/technomancy/leiningen) dependency information:
 
 ```clojure
-[adgoji/cascalog-graph "0.2.2"]
+[adgoji/cascalog-graph "0.2.4"]
 ```
 
-The Git master branch is at version 0.2.3-SNAPSHOT.
+The Git master branch is at version 0.2.5-SNAPSHOT.
 
 ## Usage
 
@@ -94,10 +94,6 @@ And execute it from the command line:
 
     lein run -m your_namespace.example --alpha-tap alpha.hfs-seqfile --beta-tap beta.hfs-seqfile --output-tap stdout
 
-Print workflow for debugging
-
-    lein run -m your_namespace.example --mode debug
-
 Output to Graphiz' dot format for visualization:
 
     lein run -m your_namespace.example --mode dot
@@ -112,7 +108,10 @@ Sometimes you need to validate the input through the command line (e.g. with som
 
 ## Todo
 
-* Change the underlying bridge to Cascalog.checkpoint. Instead of generating code it should directly call the Checkpoint API. This will make things like skipping steps actually work
+* Test suite
+* Expand tap validation
+* Better command line validation messages
+* Documentation
 
 ## Credits
 
