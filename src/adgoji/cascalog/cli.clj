@@ -116,11 +116,11 @@
                                                  :else :source)})
                                   v)]) opts))))
 
-(defmethod run-mode :validation [{:keys [opts banner graph-meta]}]
-  (validate-options! (mk-taps opts graph-meta) banner))
+(defmethod run-mode :validation [{:keys [cli-options banner callback job-options banner graph-meta]}]
+  (validate-options! (mk-taps cli-options job-options) banner))
 
-(defmethod run-mode :execute [{:keys [input-options banner callback job-options]}]
-  (let [tap-opts (mk-taps input-options (if-not (fn? callback) (graph/tap-options callback)))
+(defmethod run-mode :execute [{:keys [cli-options banner callback job-options]}]
+  (let [tap-opts (mk-taps cli-options (if-not (fn? callback) (graph/tap-options callback)))
         [success? msg] (validate-options tap-opts)]
     (when-not success?
       (handle-result banner success? msg))
@@ -159,14 +159,14 @@
 (defmethod run-mode :debug [{:keys [callback]}]
   (println "doesn't make sense anymore? what do you want to see?"))
 
-(defmethod run-mode :default [{:keys [opts banner]}]
-  (handle-result banner false (str "Error: run mode '" (:mode opts) "' not recognized")))
+(defmethod run-mode :default [{:keys [cli-options banner]}]
+  (handle-result banner false (str "Error: run mode '" (:mode cli-options) "' not recognized")))
 
 (defn run-cmd [job-fn job-options cli-args]
   (let [{:keys [errors banner opts trailing-args] :as cli-validation} (validate-cli-args (graph/fnk-input-keys job-fn) cli-args)]
     (run-mode {:callback job-fn
                :mode (:mode opts)
-               :input-options opts :errors errors :banner banner
+               :cli-options opts :cli-errors errors :banner banner
                :job-options job-options
                :trailing-args trailing-args})))
 
