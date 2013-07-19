@@ -55,31 +55,66 @@
 (defn graphify [graph-like]
   (graph/->graph graph-like))
 
+(defn steps-graph [graph]
+  (set (keys graph)))
+
+(defn deps-serial
+  "derive a dependency graph with width 1 (useful for serial processing)"
+  [graph]
+  (let [steps (steps-graph graph)]
+    (first
+     (reduce (fn [[acc previous-step] [k f]]
+               [(assoc acc k [previous-step]) k])
+             [{} nil] graph))))
+
+(defn deps-parallel
+  "derive a tree of dependencies gives a graph"
+  [graph]
+  (let [steps (steps-graph graph)]
+    (reduce (fn [acc [k f]]
+              (assoc acc k (filter steps (fnk-input-keys f))))
+            {} graph)))
+
+(defn recursive-deps
+  "given expected nodes and a tree derives all needed nodes in that tree"
+  [deps tree]
+  (loop [deps* deps nodes deps]
+    (let [new-deps (seq (remove (set nodes) (mapcat tree deps*)))]
+      (if-not new-deps
+        nodes
+        (recur new-deps (concat nodes new-deps))))))
+
 (defn select-nodes
-  "Makes a new graph (see Prismatic's Graph lib) based on the given output mapping. The new graph
+  "Makes a new graph (see Prismatic's Graph lib) based on the given output mapping (and available inputs). The new graph
    can be a subset of the original graph when the original graph has nodes that are unneeded
    to calculate the output
 
   `(mk-graph-fnk {} {:alpha :alpha-tap})"
-  [graph output-mapping]
-  {:pre [(clojure.set/superset? (set (keys graph)) (set (keys output-mapping)))]}
-  (graphify (reduce (fn [g [k v]]
-                      (if (seq (steps-dependent g k))
-                        (let [output-node (-> k name (str "-sink-step") keyword)]
-                          (assoc g output-node (fn->output-fnk (fn [{input-tap k output-tap v}]
-                                                               (cas/?- output-tap input-tap))
-                                                             [{k true v true} true]
-                                                             v)))
-                        ;; Update old function keep old-schemata plus the output tap schemata
-                        ;; -
-                        ;; (?- ~(symbol (name v)) (apply prev-fn args)
-                        (update-in g [k] (fn [prev-fn]
-                                           (let [prev-input-args (fnk-input-keys prev-fn)]
-                                             (fn->output-fnk (fn [{output-tap v :as args}]
-                                                             (cas/?- output-tap (prev-fn (select-keys args prev-input-args))))
-                                                             (update-in (pfnk/io-schemata prev-fn) [0] assoc v true)
-                                                             v))))))
-                    graph (filter (comp graph key) output-mapping))))
+  ([graph output-mapping available-nodes]
+     {:pre [(every? (set (keys graph)) available-nodes)]}
+     (let [deps-tree (apply dissoc (deps-parallel graph) available-nodes)
+           desired-nodes (keys output-mapping)
+           needed-nodes (remove (set available-nodes) (recursive-deps desired-nodes deps-tree))]
+       (select-nodes (select-keys graph needed-nodes) output-mapping)))
+  ([graph output-mapping]
+     {:pre [(clojure.set/superset? (set (keys graph)) (set (keys output-mapping)))]}
+     (graphify (reduce (fn [g [k v]]
+                         (if (seq (steps-dependent g k))
+                           (let [output-node (-> k name (str "-sink-step") keyword)]
+                             (assoc g output-node (fn->output-fnk (fn [{input-tap k output-tap v}]
+                                                                    (cas/?- output-tap input-tap))
+                                                                  [{k true v true} true]
+                                                                  v)))
+                           ;; Update old function keep old-schemata plus the output tap schemata
+                           ;; -
+                           ;; (?- ~(symbol (name v)) (apply prev-fn args)
+                           (update-in g [k] (fn [prev-fn]
+                                              (let [prev-input-args (fnk-input-keys prev-fn)]
+                                                (fn->output-fnk (fn [{output-tap v :as args}]
+                                                                  (cas/?- output-tap (prev-fn (select-keys args prev-input-args))))
+                                                                (update-in (pfnk/io-schemata prev-fn) [0] assoc v true)
+                                                                v))))))
+                       graph (filter (comp graph key) output-mapping)))))
 
 (defn transact
   "Create a new graph in which the `nodes-after have the intermediate nodes as dependency
@@ -92,22 +127,6 @@
                                                          [:plumbing.fnk.pfnk/io-schemata 0]
                                                          (partial apply assoc) io-schemata-all-nodes)]) nodes-after))]
     (merge nodes-before graph nodes-after)))
-
-(defn steps-graph [graph]
-  (set (keys graph)))
-
-(defn deps-serial [graph]
-  (let [steps (steps-graph graph)]
-    (first
-     (reduce (fn [[acc previous-step] [k f]]
-               [(assoc acc k [previous-step]) k])
-             [{} nil] graph))))
-
-(defn deps-parallel [graph]
-  (let [steps (steps-graph graph)]
-    (reduce (fn [acc [k f]]
-              (assoc acc k (filter steps (fnk-input-keys f))))
-            {} graph)))
 
 (defn tap-options [graph]
   (let [all-options (set (keys (pfnk/input-schema graph)))
