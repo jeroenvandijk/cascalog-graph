@@ -7,7 +7,7 @@ Cascalog Graph is a library that combines two ideas: [workflow checkpoint](https
 The result is a library that provides the following:
 
 * an easy way to declare dependencies between Cascalog queries
-* modularity of Cascalog workflows; they can be merged now, allowing easy reuse of common parts. 
+* modularity of Cascalog workflows; they can be merged now, allowing easy reuse of common parts.
 * Easier debugging, because you can focus on certain parts of a workflow without the need to copy code.
 * A way to visualize complex flows
 * Maybe more, if we can think of new execution strategies e.g. for logging, profiling, debugging etc. [see the Graph blog post](http://blog.getprismatic.com/blog/2012/10/1/prismatics-graph-at-strange-loop.html)
@@ -15,7 +15,7 @@ The result is a library that provides the following:
 ## Constraints
 
 * The name of a function is the name that is used to match dependencies
-* Internal dependencies of a graph are treated as intermediate steps which will always output to a temporary seqfile dir. 
+* Internal dependencies of a graph are treated as intermediate steps which will always output to a temporary seqfile dir.
 * External dependencies are treated as endpoints, and never as intermediate dependencies, thus a requirement for these steps is to define their own output strategy.
 
 ## Motivation
@@ -26,15 +26,15 @@ Cascalog.checkpoint is great for when you start to build complex flows. It makes
 
 Cascalog-Graph is on [Clojars](https://clojars.org/adgoji/cascalog-graph)
 
-Latest release is 0.2.4
+Latest release is 0.2.5
 
 [Leiningen](https://github.com/technomancy/leiningen) dependency information:
 
 ```clojure
-[adgoji/cascalog-graph "0.2.4"]
+[adgoji/cascalog-graph "0.2.5"]
 ```
 
-The Git master branch is at version 0.2.5-SNAPSHOT.
+The Git master branch is at version 0.2.6-SNAPSHOT.
 
 ## Usage
 
@@ -45,7 +45,7 @@ The following example is a copy of [Stuart Sierra's flow example](https://github
          '[adgoji.cascalog.graph :as g])
 
 (def result (g/fnk [gamma delta epsilon output-tap]
-  (?<- output-tap 
+  (?<- output-tap
     [?result]
     (gamma ?idx ?gamma)
     (delta ?idx ?delta)
@@ -70,9 +70,9 @@ The following example is a copy of [Stuart Sierra's flow example](https://github
     (delta ?idx ?delta)
     (+ ?gamma ?delta :> ?epsilon))))
 
-(def complete-flow {:result result 
-                    :gamma gamma 
-                    :delta delta 
+(def complete-flow {:result result
+                    :gamma gamma
+                    :delta delta
                     :epsilon epsilon})
 ```
 
@@ -89,7 +89,7 @@ Or create a command line access point to the workflow
 
 (defjob example complete-flow)
 ```
-    
+
 And execute it from the command line:
 
     lein run -m your_namespace.example --alpha-tap alpha.hfs-seqfile --beta-tap beta.hfs-seqfile --output-tap stdout
@@ -116,7 +116,7 @@ Sometimes you need to validate the input through the command line (e.g. with som
 ## Credits
 
 * Prismatic for coining the ideas of Graph (see [blogpost]([http://blog.getprismatic.com/blog/2012/10/1/prismatics-graph-at-strange-loop.html))
-* Stuart Sierra for building flow [an implementation of the Graph idea](https://github.com/stuartsierra/flow) 
+* Stuart Sierra for building flow [an implementation of the Graph idea](https://github.com/stuartsierra/flow)
 * Sam Ritchie and Contributors for building Cascalog.checkpoint that makes this library actually do anything
 * [AdGoji](http://www.adgoji.com/) for giving me time to work on this
 
