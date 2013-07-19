@@ -163,10 +163,13 @@
   [graph & [options]]
   (let [{:keys [graph-name]
          :or {graph-name "graph"}} options
-         graph (graph/->graph graph)]
+         graph (graph/->graph graph)
+         {sink-options :sink-options} (tap-options graph)]
     (println "digraph" (pr-str (name graph-name)) "{")
     (when (map? graph)
       (doseq [sym (keys graph)
               dep (when-let [node (graph sym)] (fnk-input-keys node))]
-        (println "  " (pr-str (name dep)) "->" (pr-str (name sym)) ";")))
+        (if (sink-options dep)
+          (println "  " (pr-str (name sym)) "->" (pr-str (name dep)) ";")
+          (println "  " (pr-str (name dep)) "->" (pr-str (name sym)) ";"))))
     (println "}")))
