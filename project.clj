@@ -12,8 +12,8 @@
                  ;; FIXME There seems to be an issue with 0.1.0
                  [prismatic/plumbing "0.0.1"]
                  
-                 [cascalog/cascalog-core "2.0.0"]
-                 [cascalog-checkpoint "0.2.0" :exclusions [jackknife hadoop-util]]
+                 [cascalog/cascalog-core "2.1.0"]
+                 [cascalog/cascalog-checkpoint "2.1.0"]
 
                  ;; Command line args processing
                  [org.clojure/tools.cli "0.2.2"]
@@ -29,7 +29,7 @@
                          [midje "1.5.1" :exclusions [org.codehaus.plexus/plexus-utils org.clojure/math.combinatorics]]
                          ;; In order to prevent internal midje conflicts
                          [org.codehaus.plexus/plexus-utils "3.0"]
-                         [cascalog/midje-cascalog "1.10.1" :exclusions [midje]]
+                         [cascalog/midje-cascalog "2.1.0" :exclusions [midje]]
                          [org.clojure/clojure "1.5.1"]
                          [org.apache.hadoop/hadoop-core "0.20.2-dev" :exclusions [log4j org.slf4j/slf4j-log4j12 org.slf4j/slf4j-api commons-logging]]]
     }

@@ -1,6 +1,6 @@
 (ns adgoji.cascalog.graph.test
   (:require [adgoji.cascalog.graph :as g]
-            [cascalog.io :as io]
+            [cascalog.cascading.io :as io]
             [cascalog.api :as casc]
             clojure.pprint))
 
