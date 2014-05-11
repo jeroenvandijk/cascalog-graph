@@ -6,7 +6,6 @@
    [plumbing.graph :as graph]
    [plumbing.fnk.pfnk :as pfnk]
    [cascalog.api :as cas]
-   [cascalog.rules :as cas-rules]
    [adgoji.cascalog.checkpoint  :as checkpoint]))
 
 (defn fnk-type [fnk]
@@ -153,8 +152,9 @@
                                                    intermediate-seqfile
                                                    (cas/hfs-seqfile tmp-dir
                                                                     ;; TODO select out fields from generator, bit clumpsy
-                                                                    :outfields (when (cas-rules/generator-selector query)
-                                                                                 (cas/get-out-fields query)))]
+                                                                    :outfields
+                                                                    (cas/get-out-fields query) ;; REVIEW does this fail?
+                                                                    )]
                                                ;; Run query and return seqfile
                                                (cas/?- (name k) intermediate-seqfile query)
                                                intermediate-seqfile))

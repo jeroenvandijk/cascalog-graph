@@ -3,7 +3,7 @@
   ;; from cascalog checkpoint
   (:use [cascalog.api :only [with-job-conf get-out-fields]])
   (:require [hadoop-util.core :as h]
-            [cascalog.conf :as conf]
+            [cascalog.cascading.conf :as conf]
             [jackknife.core :as u]
             [jackknife.seq :as seq])
   (:import [java.util Collection]
